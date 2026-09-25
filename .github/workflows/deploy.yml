@@ -45,6 +45,9 @@ jobs:
             docker compose -f docker-compose.yml -f docker-compose.prod.yml down --remove-orphans
             # Wait for containers to fully stop
             sleep 10
+            # Remove leftover playmystation networks by ID (duplicate networks with the
+            # same name make 'up' fail with "network is ambiguous")
+            docker network ls --filter name=playmystation -q | xargs -r docker network rm 2>/dev/null || true
             # Build with cache busting using git commit hash
             BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
             GIT_COMMIT=$(git rev-parse --short HEAD)
