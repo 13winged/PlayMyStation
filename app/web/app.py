@@ -1,16 +1,63 @@
-"""FastAPI-приложение (только OAuth callbacks + healthcheck)."""
+"""FastAPI-приложение (OAuth callbacks + healthcheck + webhook)."""
 
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
 
+from aiogram import Bot
+from aiogram.types import Update
+from fastapi import FastAPI, Header, HTTPException, Request
+
+from app.core.config import get_settings
 from app.web.oauth import router as oauth_router
+
+# Глобальный bot instance для webhook (устанавливается в main.py)
+_bot: Bot | None = None
+
+
+def set_webhook_bot(bot: Bot) -> None:
+    """Установить bot instance для webhook handler."""
+    global _bot
+    _bot = bot
+
+
+def get_webhook_bot() -> Bot | None:
+    return _bot
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: ничего не делаем здесь, webhook ставится в main.py
+    yield
+    # Shutdown: ничего не делаем здесь
 
 
 def create_web_app() -> FastAPI:
-    app = FastAPI(title="PlayMyStation OAuth")
+    settings = get_settings()
+    app = FastAPI(title="PlayMyStation OAuth", lifespan=lifespan)
     app.include_router(oauth_router)
 
     @app.get("/health")
     async def health() -> dict:
         return {"ok": True}
+
+    # Webhook endpoint (только если настроен webhook_url)
+    if settings.use_webhook:
+        @app.post(settings.webhook_path)
+        async def webhook(
+            request: Request,
+            x_telegram_bot_api_secret_token: str | None = Header(None, alias="X-Telegram-Bot-Api-Secret-Token"),
+        ) -> dict:
+            # Проверка секрета
+            if settings.webhook_secret and x_telegram_bot_api_secret_token != settings.webhook_secret:
+                raise HTTPException(status_code=403, detail="Invalid secret token")
+
+            bot = get_webhook_bot()
+            if bot is None:
+                raise HTTPException(status_code=500, detail="Bot not initialized")
+
+            # Парсим update и передаём в dispatcher
+            data = await request.json()
+            update = Update.model_validate(data, context={"bot": bot})
+            await bot.dispatcher.feed_update(bot, update)
+            return {"ok": True}
 
     return app

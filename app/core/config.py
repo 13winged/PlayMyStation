@@ -38,6 +38,16 @@ class Settings(BaseSettings):
     web_port: int = Field(default=8000, alias="WEB_PORT")
     public_base_url: str = Field(default="http://localhost:8000", alias="PUBLIC_BASE_URL")
 
+    # Webhook settings (если заданы — используется webhook вместо polling)
+    webhook_url: str = Field(default="", alias="WEBHOOK_URL")
+    webhook_secret: str = Field(default="", alias="WEBHOOK_SECRET")
+    webhook_path: str = Field(default="/webhook", alias="WEBHOOK_PATH")
+
+    @property
+    def use_webhook(self) -> bool:
+        """True если настроен webhook_url — переключаемся на webhook mode."""
+        return bool(self.webhook_url)
+
 
 @lru_cache
 def get_settings() -> Settings:
