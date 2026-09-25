@@ -18,6 +18,7 @@ log = logging.getLogger("playmystation.spotify")
 
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 NOW_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
+RECENTLY_PLAYED_URL = "https://api.spotify.com/v1/me/player/recently-played"
 
 TokenSaver = Callable[[str, str | None, dt.datetime | None], Awaitable[None]]
 
@@ -51,7 +52,10 @@ async def close_spotify_client() -> None:
 
 
 def build_authorize_url(
-    state: str, scopes: str = "user-read-currently-playing user-read-playback-state"
+    state: str,
+    scopes: str = (
+        "user-read-currently-playing user-read-playback-state user-read-recently-played"
+    ),
 ) -> str:
     s = get_settings()
     from urllib.parse import urlencode
@@ -151,14 +155,23 @@ class SpotifyService(BaseMusicService):
             return None
 
         if resp.status_code == 204:
-            log.info("currently-playing: 204 No Content (nothing playing)")
-            return None  # ничего не играет, 204 No Content
+            log.info("currently-playing: 204 No Content, trying recently-played")
+            return await self._get_recently_played()
         if resp.status_code == 401 and self._refresh_token:
             log.info("currently-playing: 401, trying token refresh")
             if await self._refresh():
                 return await self.get_currently_playing()
             log.warning("currently-playing: 401 and refresh failed")
             return None
+        if resp.status_code == 403:
+            # Free-аккаунты без Premium: Spotify закрывает realtime player API
+            # (reason=PREMIUM_REQUIRED). Падаем назад на recently-played.
+            try:
+                body = resp.text[:200]
+            except Exception:  # noqa: BLE001
+                body = "<unreadable>"
+            log.info("currently-playing: 403 Forbidden (%s), trying recently-played", body)
+            return await self._get_recently_played()
         if resp.status_code != 200:
             log.info("currently-playing: unexpected status %s", resp.status_code)
             return None
@@ -182,4 +195,50 @@ class SpotifyService(BaseMusicService):
             track_url=(item.get("external_urls") or {}).get("spotify"),
             provider="spotify",
             preview_url=item.get("preview_url"),  # 30-секундное превью (может быть None)
+        )
+
+    async def _get_recently_played(self) -> TrackDTO | None:
+        """Фолбэк для случаев, когда realtime player API недоступен.
+
+        `recently-played` работает и на free-аккаунтах (нужен скоуп
+        user-read-recently-played). Возвращает последний трек
+        с is_playing=False — честный UX «последний трек», как у SoundCloud.
+        """
+        client = await _get_spotify_client()
+
+        async def _do_request() -> httpx.Response:
+            return await client.get(
+                RECENTLY_PLAYED_URL,
+                headers={"Authorization": f"Bearer {self._access_token}"},
+                params={"limit": 1},
+            )
+
+        try:
+            resp = await SPOTIFY_CIRCUIT.call(_do_request)
+        except httpx.HTTPStatusError as e:
+            log.info("recently-played request failed: %s", e)
+            return None
+        if resp.status_code != 200:
+            log.info("recently-played: unexpected status %s", resp.status_code)
+            return None
+        data = resp.json()
+        items = data.get("items") or []
+        if not items:
+            log.info("recently-played: empty history")
+            return None
+        item = (items[0].get("track") or {}) if isinstance(items[0], dict) else {}
+        artists = ", ".join(a.get("name", "") for a in item.get("artists", [])) or "Unknown artist"
+        images = (item.get("album") or {}).get("images") or []
+        log.info("recently-played: '%s' — %s", item.get("name"), artists)
+        return TrackDTO(
+            title=item.get("name", "Unknown title"),
+            artist=artists,
+            album=(item.get("album") or {}).get("name"),
+            duration_ms=item.get("duration_ms"),
+            progress_ms=None,
+            is_playing=False,
+            cover_url=images[0]["url"] if images else None,
+            track_url=(item.get("external_urls") or {}).get("spotify"),
+            provider="spotify",
+            preview_url=item.get("preview_url"),
         )
