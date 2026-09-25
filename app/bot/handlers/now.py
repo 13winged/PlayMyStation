@@ -1,4 +1,5 @@
 """Команда /now и /np: опрос активного сервиса или всех (режим ALL)."""
+
 from __future__ import annotations
 
 from aiogram import F, Router

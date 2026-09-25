@@ -1,4 +1,5 @@
 """Привязка Яндекс Музыки через /yandex <token>. Токен шифруется в БД."""
+
 from __future__ import annotations
 
 from aiogram import Router
@@ -19,9 +20,7 @@ async def cmd_yandex(
 ) -> None:
     token = (command.args or "").strip().strip('"').strip("'")
     if not token:
-        await message.answer(
-            "🔴 Пришли токен так:\n<code>/yandex &lt;твой_токен&gt;</code>"
-        )
+        await message.answer("🔴 Пришли токен так:\n<code>/yandex &lt;твой_токен&gt;</code>")
         return
     # Быстрая проверка токена перед сохранением
     svc = YandexMusicService(token)
@@ -36,7 +35,7 @@ async def cmd_yandex(
 
             Client(token).init()
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001 — любая ошибка = невалидный токен
             return False
 
     valid = await _aio.to_thread(_check)
@@ -49,9 +48,11 @@ async def cmd_yandex(
     )
     await session.commit()
     hint = " (очередь пуста — запусти трек и проверь /now)" if probe is None else ""
-    await message.answer(f"✅ Яндекс Музыка подключена{hint}. Активный сервис: {db_user.active_provider}.")
+    await message.answer(
+        f"✅ Яндекс Музыка подключена{hint}. Активный сервис: {db_user.active_provider}."
+    )
     # Удаляем сообщение с токеном из чата по возможности (гигиена секретов)
     try:
         await message.delete()
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 — удаление best-effort
         pass

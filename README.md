@@ -39,5 +39,50 @@ python -m app.main
 - **Яндекс** — нет `currently playing` в API → читаем очередь (`queues_list`), прогресс недоступен.
 - **SoundCloud** — нет realtime → `play-history` / фолбэк `favorites`, помечаем как «последний трек».
 
+## CI/CD & Deploy
+
+- **CI** (`.github/workflows/ci.yml`): ruff + compileall + pytest + docker build — на каждый push/PR.
+- **CD** (`.github/workflows/deploy.yml`): пуш в `master` → SSH на прод-сервер → `git pull` → `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build` → healthcheck. Прод-override добавляет `restart: unless-stopped` и **Caddy** (авто-https через Let's Encrypt).
+
+Подготовка сервера (Ubuntu, один раз, по SSH):
+```bash
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-plugin git
+sudo usermod -aG docker $USER   # затем перелогиниться
+sudo ufw allow 22,80,443/tcp && sudo ufw enable
+```
+
+SSH-ключ для деплоя (на своей машине):
+```powershell
+ssh-keygen -t ed25519 -f $env:USERPROFILE\.ssh\playmystation_deploy -N '""'
+```
+Публичный ключ добавить на сервер в `~/.ssh/authorized_keys`, приватный — в секрет `SSH_PRIVATE_KEY`.
+
+GitHub Secrets (репозиторий → Settings → Secrets and variables → Actions):
+| Секрет | Значение |
+|---|---|
+| `SSH_HOST` | IP сервера, напр. `45.86.66.95` |
+| `SSH_PORT` | `22` |
+| `SSH_USER` | пользователь на сервере |
+| `SSH_PRIVATE_KEY` | приватный ключ деплоя целиком |
+| `GH_PAT` | fine-grained PAT с `contents:read` на этот репозиторий (нужен для `git clone/pull` приватного репо) |
+| `DOMAIN` | домен, напр. `music.example.com` (A-запись → IP сервера) |
+| `ENV_PROD` | содержимое прод-`.env` целиком (см. ниже) |
+
+`ENV_PROD` (шаблон):
+```
+BOT_TOKEN=...
+FERNET_KEY=...
+DATABASE_URL=postgresql+asyncpg://playmystation:playmystation@postgres:5432/playmystation
+REDIS_URL=redis://redis:6379/0
+SPOTIFY_CLIENT_ID=...
+SPOTIFY_CLIENT_SECRET=...
+SPOTIFY_REDIRECT_URI=https://<DOMAIN>/oauth/spotify/callback
+PUBLIC_BASE_URL=https://<DOMAIN>
+WEB_HOST=0.0.0.0
+WEB_PORT=8000
+```
+
+⚠️ **Важно про Spotify**: Redirect URI, отличные от `localhost`, обязаны быть `https` — иначе Spotify их отклонит. Поэтому прод требует **домен + Caddy** (уже в compose). После деплоя добавь `https://<DOMAIN>/oauth/spotify/callback` в Spotify Dashboard → Settings → Redirect URIs.
+
 ## Карта разработки
 См. [ROADMAP.md](./ROADMAP.md).

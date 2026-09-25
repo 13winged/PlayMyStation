@@ -1,4 +1,5 @@
 """Хэндлеры /start и /services — точка входа в мультиаккаунтинг."""
+
 from __future__ import annotations
 
 from aiogram import F, Router
@@ -50,9 +51,7 @@ async def cmd_services(message: Message, session: AsyncSession, db_user: User) -
 async def cb_back(cb: CallbackQuery, session: AsyncSession, db_user: User) -> None:
     integrations = await repo.list_integrations(session, db_user.id)
     bound, active = _bound_and_active(db_user, integrations)
-    await cb.message.edit_text(
-        "⚙️ <b>Мои сервисы</b>", reply_markup=services_kb(bound, active)
-    )
+    await cb.message.edit_text("⚙️ <b>Мои сервисы</b>", reply_markup=services_kb(bound, active))
     await cb.answer()
 
 

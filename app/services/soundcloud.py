@@ -5,6 +5,7 @@
 и помечаем is_playing=False c пометкой 'last played'.
 Если в будущем появится realtime endpoint — заменить только этот класс.
 """
+
 from __future__ import annotations
 
 import httpx

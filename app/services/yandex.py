@@ -5,6 +5,7 @@
 Возвращаем текущий трек очереди как наиболее вероятный 'now playing'.
 Sync-библиотека yandex-music выполняется в asyncio.to_thread.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -35,7 +36,11 @@ class YandexMusicService(BaseMusicService):
         cover = None
         if full.cover_uri:
             cover = "https://" + full.cover_uri.replace("%%", "400x400")
-        track_url = f"https://music.yandex.ru/album/{full.albums[0].id}/track/{full.id}" if full.albums else None
+        track_url = (
+            f"https://music.yandex.ru/album/{full.albums[0].id}/track/{full.id}"
+            if full.albums
+            else None
+        )
         return TrackDTO(
             title=full.title or "Unknown title",
             artist=artists,
@@ -51,5 +56,5 @@ class YandexMusicService(BaseMusicService):
     async def get_currently_playing(self) -> TrackDTO | None:
         try:
             return await asyncio.to_thread(self._fetch_sync)
-        except Exception:
+        except Exception:  # noqa: BLE001 — API Яндекса нестабилен, деградируем в None
             return None

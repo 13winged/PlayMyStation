@@ -1,4 +1,5 @@
 """Точка входа: aiogram polling + FastAPI (uvicorn) в одном asyncio-процессе."""
+
 from __future__ import annotations
 
 import asyncio
@@ -36,7 +37,7 @@ def create_dispatcher() -> Dispatcher:
     try:
         settings = get_settings()
         storage = RedisStorage.from_url(settings.redis_url)
-    except Exception:
+    except Exception:  # noqa: BLE001 — нет Redis = MemoryStorage
         storage = MemoryStorage()  # type: ignore[assignment]
     dp = Dispatcher(storage=storage)
     dp.message.middleware(DbSessionMiddleware(SessionFactory))

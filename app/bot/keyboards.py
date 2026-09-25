@@ -1,4 +1,5 @@
 """Inline-клавиатуры: статусы привязки + выбор активного сервиса."""
+
 from __future__ import annotations
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -16,9 +17,7 @@ def services_kb(bound: set[str], active: str) -> InlineKeyboardMarkup:
     for provider, (label, _emoji) in PROVIDER_META.items():
         mark = "✅" if provider in bound else "➕"
         status_row.append(
-            InlineKeyboardButton(
-                text=f"{mark} {label}", callback_data=f"svc:toggle:{provider}"
-            )
+            InlineKeyboardButton(text=f"{mark} {label}", callback_data=f"svc:toggle:{provider}")
         )
     rows.append(status_row)
 

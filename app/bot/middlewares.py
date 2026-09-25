@@ -1,4 +1,5 @@
 """Middlewares: проброс AsyncSession и обеспечение User в handler data."""
+
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
@@ -6,7 +7,7 @@ from typing import Any
 
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import repositories as repo
 

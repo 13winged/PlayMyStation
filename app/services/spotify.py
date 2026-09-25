@@ -1,4 +1,5 @@
 """Spotify: OAuth2 + /me/player/currently-playing с авто-рефрешем токена."""
+
 from __future__ import annotations
 
 import base64
@@ -16,7 +17,9 @@ NOW_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
 TokenSaver = Callable[[str, str | None, dt.datetime | None], Awaitable[None]]
 
 
-def build_authorize_url(state: str, scopes: str = "user-read-currently-playing user-read-playback-state") -> str:
+def build_authorize_url(
+    state: str, scopes: str = "user-read-currently-playing user-read-playback-state"
+) -> str:
     s = get_settings()
     from urllib.parse import urlencode
 
@@ -49,7 +52,9 @@ class SpotifyService(BaseMusicService):
         if not self._refresh_token:
             return False
         s = get_settings()
-        basic = base64.b64encode(f"{s.spotify_client_id}:{s.spotify_client_secret}".encode()).decode()
+        basic = base64.b64encode(
+            f"{s.spotify_client_id}:{s.spotify_client_secret}".encode()
+        ).decode()
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
                 TOKEN_URL,
@@ -61,17 +66,19 @@ class SpotifyService(BaseMusicService):
         data = resp.json()
         self._access_token = data["access_token"]
         expires_in = int(data.get("expires_in", 3600))
-        self._expires_at = dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=expires_in)
+        self._expires_at = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in)
         if "refresh_token" in data:
             self._refresh_token = data["refresh_token"]
         if self._on_tokens_refreshed:
-            await self._on_tokens_refreshed(self._access_token, self._refresh_token, self._expires_at)
+            await self._on_tokens_refreshed(
+                self._access_token, self._refresh_token, self._expires_at
+            )
         return True
 
     async def get_currently_playing(self) -> TrackDTO | None:
         # Проактивный рефреш за 60 секунд до истечения
         if self._expires_at and self._refresh_token:
-            now = dt.datetime.now(dt.timezone.utc)
+            now = dt.datetime.now(dt.UTC)
             if (self._expires_at - now).total_seconds() < 60:
                 await self._refresh()
 

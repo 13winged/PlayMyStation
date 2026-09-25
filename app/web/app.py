@@ -1,4 +1,5 @@
 """FastAPI-приложение (только OAuth callbacks + healthcheck)."""
+
 from fastapi import FastAPI
 
 from app.web.oauth import router as oauth_router

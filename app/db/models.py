@@ -1,4 +1,5 @@
 """SQLAlchemy 2.0 Async модели: users + integrations (мультиаккаунтинг)."""
+
 from __future__ import annotations
 
 import datetime as dt
@@ -6,7 +7,6 @@ from typing import Literal
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-
 
 Provider = Literal["spotify", "yandex", "soundcloud"]
 ActiveProvider = Literal["spotify", "yandex", "soundcloud", "all"]
@@ -25,10 +25,10 @@ class User(Base):
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     active_provider: Mapped[str] = mapped_column(String(20), default="all")
     created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.timezone.utc)
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
     )
 
-    integrations: Mapped[list["Integration"]] = relationship(
+    integrations: Mapped[list[Integration]] = relationship(
         back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
 

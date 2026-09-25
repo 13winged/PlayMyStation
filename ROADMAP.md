@@ -26,7 +26,8 @@
 ## Milestone 3 — Продакшн
 - [ ] Webhook вместо polling (сертификат, секрет), graceful shutdown
 - [ ] Метрики Prometheus + Sentry, структурированные логи (structlog)
-- [ ] CI (ruff/pytest/docker build), CD на VPS, бэкапы Postgres
+- [x] CI (ruff/pytest/docker build) + CD на VPS через GitHub Actions + Caddy (https)
+- [ ] Бэкапы Postgres
 - [ ] Ротация Fernet-ключей, audit-log подключений
 
 ## Риски

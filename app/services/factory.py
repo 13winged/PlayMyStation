@@ -1,4 +1,5 @@
 """Фабрика стратегий: собирает нужный сервис по provider + Integration."""
+
 from __future__ import annotations
 
 import asyncio

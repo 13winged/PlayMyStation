@@ -2,6 +2,7 @@
 
 state = telegram_id. После обмена code->token сохраняем интеграцию в БД.
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -35,9 +36,7 @@ async def spotify_callback(code: str = Query(), state: str = Query()) -> dict:
     if resp.status_code != 200:
         raise HTTPException(400, f"Spotify token exchange failed: {resp.text}")
     data = resp.json()
-    expires_at = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
-        seconds=int(data.get("expires_in", 3600))
-    )
+    expires_at = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=int(data.get("expires_in", 3600)))
     async with SessionFactory() as session:
         user = await repo.get_or_create_user(session, telegram_id)
         await repo.upsert_integration(
@@ -49,7 +48,11 @@ async def spotify_callback(code: str = Query(), state: str = Query()) -> dict:
             expires_at=expires_at,
         )
         await session.commit()
-    return {"ok": True, "provider": "spotify", "detail": "Spotify подключён! Вернись в Telegram и нажми /now 🎵"}
+    return {
+        "ok": True,
+        "provider": "spotify",
+        "detail": "Spotify подключён! Вернись в Telegram и нажми /now 🎵",
+    }
 
 
 @router.get("/soundcloud/callback")
@@ -83,4 +86,8 @@ async def soundcloud_callback(code: str = Query(), state: str = Query()) -> dict
             refresh_token=data.get("refresh_token"),
         )
         await session.commit()
-    return {"ok": True, "provider": "soundcloud", "detail": "SoundCloud подключён! Вернись в Telegram 🎵"}
+    return {
+        "ok": True,
+        "provider": "soundcloud",
+        "detail": "SoundCloud подключён! Вернись в Telegram 🎵",
+    }

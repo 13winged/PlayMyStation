@@ -1,4 +1,5 @@
 """Форматирование карточки трека: прогресс-бар + иконка провайдера."""
+
 from __future__ import annotations
 
 from app.services.base import TrackDTO
@@ -29,9 +30,11 @@ def fmt_ms(ms: int | None) -> str:
 
 def track_card(track: TrackDTO) -> str:
     icon = PROVIDER_ICON.get(track.provider, "🎵")
-    provider_name = {"spotify": "Spotify", "yandex": "Яндекс Музыка", "soundcloud": "SoundCloud"}.get(
-        track.provider, track.provider
-    )
+    provider_name = {
+        "spotify": "Spotify",
+        "yandex": "Яндекс Музыка",
+        "soundcloud": "SoundCloud",
+    }.get(track.provider, track.provider)
     status = "▶️ Сейчас играет" if track.is_playing else "⏸️ Последний трек"
     lines = [
         f"{icon} <b>{provider_name}</b> — {status}",

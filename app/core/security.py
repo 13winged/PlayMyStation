@@ -1,4 +1,5 @@
 """Шифрование OAuth-токенов перед записью в БД (Fernet)."""
+
 from __future__ import annotations
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -10,7 +11,7 @@ def _get_fernet() -> Fernet | None:
     key = get_settings().fernet_key
     try:
         return Fernet(key.encode())
-    except Exception:
+    except Exception:  # noqa: BLE001 — любой битый ключ = DEV-фолбэк
         return None
 
 

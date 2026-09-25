@@ -1,4 +1,5 @@
 """CRUD-репозитории для users / integrations. Токены шифруются на запись."""
+
 from __future__ import annotations
 
 import datetime as dt
@@ -45,9 +46,7 @@ async def upsert_integration(
     service_user_id: str | None = None,
 ) -> Integration:
     res = await session.execute(
-        select(Integration).where(
-            Integration.user_id == user_id, Integration.provider == provider
-        )
+        select(Integration).where(Integration.user_id == user_id, Integration.provider == provider)
     )
     row = res.scalar_one_or_none()
     if row is None:
@@ -78,9 +77,7 @@ async def list_integrations(session: AsyncSession, user_id: int) -> list[Integra
 
 async def delete_integration(session: AsyncSession, user_id: int, provider: str) -> bool:
     res = await session.execute(
-        select(Integration).where(
-            Integration.user_id == user_id, Integration.provider == provider
-        )
+        select(Integration).where(Integration.user_id == user_id, Integration.provider == provider)
     )
     row = res.scalar_one_or_none()
     if row is None:

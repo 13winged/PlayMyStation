@@ -1,4 +1,5 @@
 """Паттерн 'Стратегия': единый контракт для всех музыкальных провайдеров."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
