@@ -42,6 +42,8 @@ jobs:
             export DOMAIN
             # Stop and remove existing containers, network and volumes to avoid conflicts
             docker compose -f docker-compose.yml -f docker-compose.prod.yml down --remove-orphans -v --rmi local
+            # Wait for containers to fully stop
+            sleep 10
             # Force remove any leftover containers
             docker rm -f playmystation-app-1 playmystation-postgres-1 playmystation-redis-1 playmystation-caddy-1 2>/dev/null || true
             docker network rm playmystation_default 2>/dev/null || true
