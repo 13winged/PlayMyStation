@@ -31,6 +31,21 @@ log = logging.getLogger("playmystation.spotify_auth")
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 
 
+def extract_code_and_state(raw_args: str) -> tuple[str, str | None]:
+    """Извлечь чистый code (и опциональный state) из ввода пользователя.
+
+    Принимает: голый код, код с хвостом `&state=...`, целую callback-ссылку.
+    """
+    token = raw_args.strip().split()[0] if raw_args.strip() else ""
+    if "code=" in token:
+        token = token.split("code=", 1)[1]
+    code = token.split("&")[0].strip().strip('"').strip("'")
+    state = None
+    if "state=" in raw_args:
+        state = raw_args.split("state=", 1)[1].split("&")[0].split()[0].strip()
+    return code, state
+
+
 @router.message(Command("spotify"))
 async def cmd_spotify(
     message: Message, command: CommandObject, session: AsyncSession, db_user: User
@@ -46,13 +61,18 @@ async def cmd_spotify(
             "4. Пришли его этой командой (код одноразовый, живёт ~10 минут)"
         )
         return
-    # Пользователь может вставить целую callback-ссылку — вытаскиваем code=.
-    code = raw_args
-    if "code=" in raw_args:
-        code = raw_args.split("code=", 1)[1].split("&")[0].split()[0]
-    code = code.strip().strip('"').strip("'")
+    # Пользователь может вставить: голый код, код с хвостом &state=...,
+    # или целую callback-ссылку — извлекаем чистое значение code.
+    code, state = extract_code_and_state(raw_args)
     if not code:
         await message.answer("❌ Не нашёл код. Пришли <code>/spotify &lt;код&gt;</code>.")
+        return
+    # Если прислали и state — сверяем, что код выдан именно этому юзеру.
+    if state is not None and state != str(db_user.telegram_id):
+        await message.answer(
+            "❌ Этот код выдан для другого Telegram-аккаунта "
+            f"(state={state}).\nПройди авторизацию заново с этого аккаунта."
+        )
         return
 
     settings = get_settings()
