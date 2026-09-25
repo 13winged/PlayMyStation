@@ -39,7 +39,10 @@ python -m app.main
 `/now`: если `all` — `asyncio.gather` по всем привязанным, приоритет треку с `is_playing=True`.
 
 ## Ограничения API (честно)
-- **Spotify** — полноценный realtime (`currently-playing` + авторефреш токена).
+- **Spotify** — полноценный realtime (`currently-playing` + авторефреш токена), но:
+  - приложение в Development Mode требует **Premium на аккаунте-владельце приложения** (иначе все user-запросы → `403`, см. [quota modes](https://developer.spotify.com/documentation/web-api/concepts/quota-modes));
+  - free-аккаунты получают `403` на realtime player API — бот падает назад на `recently-played` («последний трек»);
+  - больше 5 пользователей — только через allowlist (User Management) или Extended Quota (только для организаций).
 - **Яндекс** — нет `currently playing` в API → читаем очередь (`queues_list`), прогресс недоступен.
 - **SoundCloud** — нет realtime → `play-history` / фолбэк `favorites`, помечаем как «последний трек».
 
