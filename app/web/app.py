@@ -69,7 +69,12 @@ def create_web_app() -> FastAPI:
             # Парсим update и передаём в dispatcher
             data = await request.json()
             update = Update.model_validate(data, context={"bot": bot})
-            await dp.feed_update(bot, update)
+            try:
+                await dp.feed_update(bot, update)
+            except Exception as e:
+                import logging
+                logging.exception("Error processing update")
+                raise HTTPException(status_code=500, detail=f"Error processing update: {e}")
             return {"ok": True}
 
     return app
