@@ -40,15 +40,11 @@ jobs:
             fi
             printf '%s' "$ENV_PROD" > .env
             export DOMAIN
-            # Stop and remove existing containers, network and volumes to avoid conflicts
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml down --remove-orphans -v --rmi local
+            # Stop containers but PRESERVE volumes (pgdata, caddy_data):
+            # -v would wipe the database and Let's Encrypt certs on every deploy!
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml down --remove-orphans
             # Wait for containers to fully stop
-            sleep 20
-            # Force remove any leftover containers
-            docker rm -f playmystation-app-1 playmystation-postgres-1 playmystation-redis-1 playmystation-caddy-1 2>/dev/null || true
-            docker network rm playmystation_default 2>/dev/null || true
-            # Verify containers are removed
-            docker ps -a --filter "name=playmystation-" --format "{{.Names}}" | xargs -r docker rm -f 2>/dev/null || true
+            sleep 10
             # Build with cache busting using git commit hash
             BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
             GIT_COMMIT=$(git rev-parse --short HEAD)

@@ -12,6 +12,8 @@ services:
     restart: unless-stopped
     depends_on:
       - app
+    environment:
+      DOMAIN: ${DOMAIN:-hissihyss2.com}
     ports:
       - "80:80"
       - "443:443"
