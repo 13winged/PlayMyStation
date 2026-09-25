@@ -8,6 +8,8 @@ WORKDIR /code
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md ./
+COPY alembic ./alembic
+COPY alembic.ini ./
 COPY app ./app
 
 RUN pip install --no-cache-dir -e . && pip install --no-cache-dir asyncpg uvicorn[standard]

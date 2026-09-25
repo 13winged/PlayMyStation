@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 import uvicorn
 from aiogram import Bot, Dispatcher
@@ -11,25 +12,36 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
+from alembic.config import Config
 
+from alembic import command
 from app.bot.handlers import now as now_handlers
 from app.bot.handlers import start as start_handlers
 from app.bot.handlers import yandex_auth as yandex_handlers
 from app.bot.middlewares import DbSessionMiddleware, EnsureUserMiddleware
 from app.core.config import get_settings
-from app.core.db import SessionFactory, engine
+from app.core.db import SessionFactory
 from app.core.redis import get_redis
-from app.db.models import Base
 from app.web.app import create_web_app
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("playmystation")
 
 
+def run_alembic_upgrade() -> None:
+    """Run alembic upgrade to head."""
+    alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
+    # Override sqlalchemy.url from settings (asyncpg) to sync driver for alembic
+    settings = get_settings()
+    sync_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+    alembic_cfg.set_main_option("sqlalchemy.url", sync_url)
+    command.upgrade(alembic_cfg, "head")
+    log.info("DB migrations applied")
+
+
 async def init_db() -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    log.info("DB tables ensured")
+    # Run alembic in thread pool since it's synchronous
+    await asyncio.to_thread(run_alembic_upgrade)
 
 
 def create_dispatcher() -> Dispatcher:

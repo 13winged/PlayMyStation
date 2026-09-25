@@ -17,6 +17,7 @@ dependencies = [
   "yandex-music>=0.0.11",
   "cryptography>=42.0",
   "python-multipart>=0.0.9",
+  "psycopg2-binary>=2.9",
 ]
 
 [project.optional-dependencies]
