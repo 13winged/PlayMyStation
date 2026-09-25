@@ -2,7 +2,8 @@ name: Deploy
 
 # Деплой на прод-сервер по SSH при пуше в master (и вручную).
 # Требует GitHub Secrets: SSH_HOST, SSH_PORT, SSH_USER, SSH_PRIVATE_KEY,
-# GH_PAT (доступ contents:read к репозиторию), DOMAIN, ENV_PROD.
+# DOMAIN, ENV_PROD.
+# На сервере должен быть настроен SSH доступ к GitHub (Deploy Key с write access).
 
 on:
   push:
@@ -20,7 +21,7 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: ENV_PROD,DOMAIN,GH_PAT
+          envs: ENV_PROD,DOMAIN
           script: |
             set -e
             mkdir -p ~/playmystation
@@ -28,7 +29,7 @@ jobs:
             if [ -d .git ]; then
               git pull --ff-only
             else
-              git clone "https://x-access-token:${GH_PAT}@github.com/13winged/PlayMyStation.git" .
+              git clone "git@github.com:13winged/PlayMyStation.git" .
             fi
             printf '%s' "$ENV_PROD" > .env
             export DOMAIN
@@ -39,4 +40,3 @@ jobs:
         env:
           ENV_PROD: ${{ secrets.ENV_PROD }}
           DOMAIN: ${{ secrets.DOMAIN }}
-          GH_PAT: ${{ secrets.GH_PAT }}
