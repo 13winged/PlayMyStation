@@ -169,4 +169,5 @@ class SpotifyService(BaseMusicService):
             cover_url=images[0]["url"] if images else None,
             track_url=(item.get("external_urls") or {}).get("spotify"),
             provider="spotify",
+            preview_url=item.get("preview_url"),  # 30-секундное превью (может быть None)
         )

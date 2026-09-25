@@ -25,6 +25,7 @@ from app.bot.middlewares import DbSessionMiddleware, EnsureUserMiddleware
 from app.core.config import get_settings
 from app.core.db import SessionFactory
 from app.core.redis import close_redis, get_redis
+from app.services.soundcloud import close_soundcloud_client
 from app.services.spotify import close_spotify_client
 from app.web.app import create_web_app, set_webhook_bot, set_webhook_dispatcher
 
@@ -142,6 +143,7 @@ async def shutdown_resources(bot: Bot | None = None) -> None:
 
     await close_redis()
     await close_spotify_client()
+    await close_soundcloud_client()
 
     # Даем время на завершение pending задач
     await asyncio.sleep(0.5)

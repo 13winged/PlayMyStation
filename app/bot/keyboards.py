@@ -54,3 +54,14 @@ def now_empty_kb() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="⚙️ Мои сервисы", callback_data="svc:back")],
         ]
     )
+
+
+def track_kb(has_preview: bool) -> InlineKeyboardMarkup:
+    """Клавиатура под карточкой трека: превью (если есть) + сервисы."""
+    rows: list[list[InlineKeyboardButton]] = []
+    if has_preview:
+        rows.append(
+            [InlineKeyboardButton(text="⏬ Превью (30 сек)", callback_data="dl:preview")]
+        )
+    rows.append([InlineKeyboardButton(text="⚙️ Мои сервисы", callback_data="svc:back")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)

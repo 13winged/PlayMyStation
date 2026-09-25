@@ -8,10 +8,41 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import httpx
 
 from app.core.config import get_settings
+from app.core.retry import SOUNDCLOUD_CIRCUIT, create_retry_transport
 from app.services.base import BaseMusicService, TrackDTO
+
+# Shared client with retry transport (exponential backoff, respects Retry-After)
+_soundcloud_client: httpx.AsyncClient | None = None
+_soundcloud_client_lock = asyncio.Lock()
+
+
+async def _get_soundcloud_client() -> httpx.AsyncClient:
+    global _soundcloud_client
+    async with _soundcloud_client_lock:
+        if _soundcloud_client is None or _soundcloud_client.is_closed:
+            _soundcloud_client = httpx.AsyncClient(
+                timeout=15.0,
+                transport=create_retry_transport(
+                    max_retries=3,
+                    base_delay=0.5,
+                    max_delay=10.0,
+                    retry_on_status=(429, 500, 502, 503, 504),
+                ),
+            )
+        return _soundcloud_client
+
+
+async def close_soundcloud_client() -> None:
+    global _soundcloud_client
+    async with _soundcloud_client_lock:
+        if _soundcloud_client is not None and not _soundcloud_client.is_closed:
+            await _soundcloud_client.aclose()
+            _soundcloud_client = None
 
 
 def build_authorize_url(state: str) -> str:
@@ -34,8 +65,11 @@ class SoundCloudService(BaseMusicService):
         self._access_token = access_token
 
     async def get_currently_playing(self) -> TrackDTO | None:
+        if SOUNDCLOUD_CIRCUIT.is_open:
+            return None  # сервис недавно сыпал ошибками — не дёргаем API
         headers = {"Authorization": f"OAuth {self._access_token}"}
-        async with httpx.AsyncClient(timeout=15) as client:
+        client = await _get_soundcloud_client()
+        try:
             # 1) пробуем play-history (новый API)
             resp = await client.get(
                 "https://api.soundcloud.com/me/play-history",
@@ -57,10 +91,17 @@ class SoundCloudService(BaseMusicService):
                 )
                 if fav.status_code == 200 and isinstance(fav.json(), list) and fav.json():
                     t = fav.json()[0]
+                    await SOUNDCLOUD_CIRCUIT.record_success()
                     return self._to_dto(t, is_playing=False)
+                if fav.status_code >= 500:
+                    await SOUNDCLOUD_CIRCUIT.record_failure()
                 return None
             raw = items[0].get("track", items[0])
+            await SOUNDCLOUD_CIRCUIT.record_success()
             return self._to_dto(raw, is_playing=False)
+        except (httpx.TimeoutException, httpx.NetworkError, httpx.ProtocolError):
+            await SOUNDCLOUD_CIRCUIT.record_failure()
+            return None
 
     @staticmethod
     def _to_dto(t: dict, is_playing: bool) -> TrackDTO:
@@ -68,6 +109,9 @@ class SoundCloudService(BaseMusicService):
         if artwork:
             artwork = artwork.replace("large", "t500x500")
         user = t.get("user") or {}
+        # Скачивание разрешено только если автор включил downloadable —
+        # иначе качать трек нельзя (ToS SoundCloud).
+        preview_url = t.get("download_url") if t.get("downloadable") else None
         return TrackDTO(
             title=t.get("title", "Unknown title"),
             artist=user.get("username", "Unknown artist"),
@@ -78,4 +122,5 @@ class SoundCloudService(BaseMusicService):
             cover_url=artwork,
             track_url=t.get("permalink_url"),
             provider="soundcloud",
+            preview_url=preview_url,
         )

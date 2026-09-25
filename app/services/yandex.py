@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 
+from app.core.retry import YANDEX_CIRCUIT
 from app.services.base import BaseMusicService, TrackDTO
 
 
@@ -54,7 +55,14 @@ class YandexMusicService(BaseMusicService):
         )
 
     async def get_currently_playing(self) -> TrackDTO | None:
+        if YANDEX_CIRCUIT.is_open:
+            return None  # сервис недавно сыпал ошибками — не дёргаем API
         try:
-            return await asyncio.to_thread(self._fetch_sync)
-        except Exception:  # noqa: BLE001 — API Яндекса нестабилен, деградируем в None
+            track = await asyncio.to_thread(self._fetch_sync)
+        except Exception:  # noqa: BLE001 — API Яндекса нестабилен
+            await YANDEX_CIRCUIT.record_failure()
             return None
+        # Пустая очередь — штатная ситуация, а не ошибка сервиса.
+        if track is not None:
+            await YANDEX_CIRCUIT.record_success()
+        return track

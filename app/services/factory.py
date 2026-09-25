@@ -16,6 +16,18 @@ from app.services.soundcloud import SoundCloudService
 from app.services.spotify import SpotifyService
 from app.services.yandex import YandexMusicService
 
+# Bulkhead: максимум времени на один сервис. Медленный/зависший провайдер
+# отваливается по таймауту и не задерживает ответ /now для остальных.
+NOW_PLAYING_TIMEOUT = 10.0
+
+
+async def _safe_get_playing(service: BaseMusicService) -> TrackDTO | None:
+    """Опрос одного сервиса с таймаутом. Любая ошибка/таймаут → None."""
+    try:
+        return await asyncio.wait_for(service.get_currently_playing(), timeout=NOW_PLAYING_TIMEOUT)
+    except (TimeoutError, Exception):  # noqa: BLE001 — один сервис не должен ронять /now
+        return None
+
 
 async def build_service(
     integration: Integration,
@@ -90,10 +102,10 @@ async def resolve_now_playing(
     if not services:
         return None
     if len(services) == 1:
-        track = await services[0].get_currently_playing()
+        track = await _safe_get_playing(services[0])
     else:
         results = await asyncio.gather(
-            *(s.get_currently_playing() for s in services), return_exceptions=True
+            *(_safe_get_playing(s) for s in services), return_exceptions=True
         )
         tracks = [r for r in results if isinstance(r, TrackDTO)]
         if not tracks:

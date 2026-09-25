@@ -229,3 +229,60 @@ async def test_resolve_now_playing_returns_cached() -> None:
         # build_service не должен вызываться, если есть кэш
         # но мы не можем легко это проверить через mock_build, так что просто проверяем результат
         mock_cache.assert_not_called()  # не должно перезаписывать кэш
+
+
+@pytest.mark.asyncio
+async def test_resolve_now_playing_slow_service_times_out() -> None:
+    """Зависший сервис отваливается по таймауту и не блокирует /now (bulkhead)."""
+    import asyncio as _asyncio
+
+    fast_track = TrackDTO(title="Fast", artist="A", provider="spotify", is_playing=True)
+
+    class SlowService:
+        provider = "yandex"
+
+        async def get_currently_playing(self) -> TrackDTO | None:
+            await _asyncio.sleep(30)
+            return TrackDTO(title="Slow", artist="B", provider="yandex", is_playing=True)
+
+    fast_svc = MockService("spotify", fast_track)
+    slow_svc = SlowService()
+
+    async def mock_build(integ, session):
+        if integ.provider == "spotify":
+            return fast_svc
+        if integ.provider == "yandex":
+            return slow_svc
+        return None
+
+    with patch("app.services.factory.build_service", side_effect=mock_build), \
+         patch("app.services.factory.NOW_PLAYING_TIMEOUT", 0.2):
+        integrations = [
+            Integration(id=1, user_id=1, provider="spotify", access_token="token"),
+            Integration(id=2, user_id=1, provider="yandex", access_token="token"),
+        ]
+        session = MagicMock(spec=AsyncSession)
+
+        result = await resolve_now_playing(integrations, session, "all")
+        assert result == fast_track
+
+
+@pytest.mark.asyncio
+async def test_resolve_now_playing_all_slow_returns_none() -> None:
+    """Если все сервисы висят — возвращаем None, а не висим вечно."""
+    import asyncio as _asyncio
+
+    class SlowService:
+        provider = "spotify"
+
+        async def get_currently_playing(self) -> TrackDTO | None:
+            await _asyncio.sleep(30)
+            return None
+
+    with patch("app.services.factory.build_service", return_value=SlowService()), \
+         patch("app.services.factory.NOW_PLAYING_TIMEOUT", 0.2):
+        integrations = [Integration(id=1, user_id=1, provider="spotify", access_token="token")]
+        session = MagicMock(spec=AsyncSession)
+
+        result = await resolve_now_playing(integrations, session, "spotify")
+        assert result is None
