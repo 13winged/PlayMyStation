@@ -19,8 +19,10 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
+# NOTE: не даём fileConfig глушить существующие логгеры приложения
+# (main.py всё равно перенастраивает логирование после миграций).
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Get database URL from settings (reads from .env)
 # Use sync driver for alembic (psycopg2 instead of asyncpg)

@@ -34,6 +34,20 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("playmystation")
 
 
+def setup_logging() -> None:
+    """(Пере)настроить логирование.
+
+    Alembic вызывает logging.config.fileConfig(), который сносит хендлеры
+    root-логгера и ставит level=WARNING — после миграций наши INFO-логи
+    глохнут. Поэтому перенастраиваемся заново (force=True).
+    """
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        force=True,
+    )
+
+
 def run_alembic_upgrade() -> None:
     """Run alembic upgrade to head."""
     alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
@@ -158,6 +172,7 @@ async def shutdown_resources(bot: Bot | None = None) -> None:
 
 async def main() -> None:
     await init_db()
+    setup_logging()  # Alembic снёс хендлеры root-логгера — восстанавливаем
 
     settings = get_settings()
     bot = Bot(
