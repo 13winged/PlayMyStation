@@ -157,9 +157,11 @@ async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> 
     elif provider == "yandex":
         await cb.message.edit_text(
             "🔴 <b>Подключение Яндекс Музыки</b>\n\n"
-            "1. Открой relay: <code>https://yandex-music-auth.vercel.app</code> (или получи токен любым способом)\n"
-            "2. Скопируй OAuth-токен Яндекса\n"
-            "3. Отправь его следующим сообщением с командой:\n"
+            "1. Открой ссылку и войди в свой Яндекс ID:\n"
+            "<code>https://oauth.yandex.ru/authorize?response_type=token&amp;client_id=23cabbbdc6cd418abb4b39c32c41195d</code>\n"
+            "2. После входа тебя вернёт на music.yandex.ru — скопируй "
+            "значение <code>access_token=...</code> из адресной строки\n"
+            "3. Пришли его боту командой:\n"
             "<code>/yandex &lt;токен&gt;</code>\n\n"
             "Токен хранится в зашифрованном виде и используется только для чтения очереди."
         )
