@@ -142,3 +142,4 @@ def create_retry_transport(
 SPOTIFY_CIRCUIT = CircuitBreaker(failure_threshold=5, recovery_timeout=30)
 YANDEX_CIRCUIT = CircuitBreaker(failure_threshold=5, recovery_timeout=60)
 SOUNDCLOUD_CIRCUIT = CircuitBreaker(failure_threshold=5, recovery_timeout=60)
+LASTFM_CIRCUIT = CircuitBreaker(failure_threshold=5, recovery_timeout=60)

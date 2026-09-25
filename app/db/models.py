@@ -8,10 +8,10 @@ from typing import Literal
 from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-Provider = Literal["spotify", "yandex", "soundcloud"]
-ActiveProvider = Literal["spotify", "yandex", "soundcloud", "all"]
+Provider = Literal["spotify", "yandex", "soundcloud", "lastfm"]
+ActiveProvider = Literal["spotify", "yandex", "soundcloud", "lastfm", "all"]
 
-PROVIDERS: tuple[Provider, ...] = ("spotify", "yandex", "soundcloud")
+PROVIDERS: tuple[Provider, ...] = ("spotify", "yandex", "soundcloud", "lastfm")
 
 
 class Base(DeclarativeBase):
@@ -39,7 +39,7 @@ class Integration(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    provider: Mapped[str] = mapped_column(String(20))  # spotify | yandex | soundcloud
+    provider: Mapped[str] = mapped_column(String(20))  # spotify | yandex | soundcloud | lastfm
     access_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     expires_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -13,6 +13,7 @@ from app.core.redis import get_cached_now_playing, set_cached_now_playing
 from app.db import repositories as repo
 from app.db.models import Integration
 from app.services.base import BaseMusicService, TrackDTO
+from app.services.lastfm import LastFmService
 from app.services.soundcloud import SoundCloudService
 from app.services.spotify import SpotifyService
 from app.services.yandex import YandexMusicService
@@ -76,6 +77,12 @@ async def build_service(
         if not token:
             return None
         return SoundCloudService(token)
+
+    if integration.provider == "lastfm":
+        # У Last.fm нет токенов: username хранится в service_user_id.
+        if not integration.service_user_id:
+            return None
+        return LastFmService(integration.service_user_id)
 
     return None
 

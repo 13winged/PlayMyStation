@@ -28,7 +28,7 @@ async def cmd_start(message: Message, session: AsyncSession, db_user: User) -> N
     bound, active = _bound_and_active(db_user, integrations)
     await message.answer(
         "👋 <b>PlayMyStation</b>\n\n"
-        "Подключи до 3 аккаунтов: Spotify, Яндекс Музыку и SoundCloud.\n"
+        "Подключи до 4 аккаунтов: Spotify, Яндекс Музыку, SoundCloud и Last.fm.\n"
         "Выбери активный сервис или режим <b>ALL</b> — тогда /now найдёт тот, где музыка играет прямо сейчас.\n\n"
         "Команды:\n"
         "• /services — подключить / выбрать сервис\n"
@@ -53,9 +53,9 @@ async def cmd_services(message: Message, session: AsyncSession, db_user: User) -
 async def cmd_disconnect(
     message: Message, command: CommandObject, session: AsyncSession, db_user: User
 ) -> None:
-    """Отключить сервис: /disconnect spotify|yandex|soundcloud"""
+    """Отключить сервис: /disconnect spotify|yandex|soundcloud|lastfm"""
     provider = (command.args or "").strip().lower()
-    valid_providers = ("spotify", "yandex", "soundcloud")
+    valid_providers = ("spotify", "yandex", "soundcloud", "lastfm")
 
     if provider not in valid_providers:
         await message.answer(
@@ -164,5 +164,13 @@ async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> 
             "3. Пришли его боту командой:\n"
             "<code>/yandex &lt;токен&gt;</code>\n\n"
             "Токен хранится в зашифрованном виде и используется только для чтения очереди."
+        )
+    elif provider == "lastfm":
+        await cb.message.edit_text(
+            "🟪 <b>Подключение Last.fm</b>\n\n"
+            "OAuth не нужен — просто пришли свой username:\n"
+            "<code>/lastfm &lt;username&gt;</code>\n\n"
+            "Чтобы бот видел треки из Spotify, свяжи Spotify → Last.fm "
+            "(скробблинг) в настройках Last.fm. Работает и на free-аккаунтах."
         )
     await cb.answer()

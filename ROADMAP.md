@@ -24,7 +24,7 @@
 - [ ] Локализация RU/EN
 
 ## Milestone 4 — По мотивам es3n1n/nowplaying (свой код, не форк)
-- [ ] **Last.fm-провайдер** (`user.getrecenttracks`, только username + API key) — рабочий `/now` для free-юзеров без Premium где бы то ни было
+- [x] **Last.fm-провайдер** (`user.getrecenttracks`, только username + API key) — рабочий `/now` для free-юзеров без Premium где бы то ни было
 - [ ] **Флаги возможностей платформы** (`PLAY/LIKE/QUEUE`) — эволюция `BaseMusicService` под управление воспроизведением
 - [ ] **Ynison-realtime для Яндекса** — портировать gRPC-клиент нативного протокола вместо эвристики по очереди
 - [ ] **song.link-матчинг** — кнопки «открыть этот же трек на …» в карточке

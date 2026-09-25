@@ -6,7 +6,7 @@ import html
 
 from app.services.base import TrackDTO
 
-PROVIDER_ICON = {"spotify": "🟢", "yandex": "🔴", "soundcloud": "🟠"}
+PROVIDER_ICON = {"spotify": "🟢", "yandex": "🔴", "soundcloud": "🟠", "lastfm": "🟪"}
 
 BAR_LEN = 12
 FILLED = "━"
@@ -37,6 +37,7 @@ def track_card(track: TrackDTO) -> str:
             "spotify": "Spotify",
             "yandex": "Яндекс Музыка",
             "soundcloud": "SoundCloud",
+            "lastfm": "Last.fm",
         }.get(track.provider, track.provider),
         quote=False,
     )

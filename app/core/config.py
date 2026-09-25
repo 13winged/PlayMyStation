@@ -34,6 +34,9 @@ class Settings(BaseSettings):
         alias="SOUNDCLOUD_REDIRECT_URI",
     )
 
+    # Last.fm: только API-ключ сервера + username юзера (OAuth не нужен)
+    lastfm_api_key: str = Field(default="", alias="LASTFM_API_KEY")
+
     web_host: str = Field(default="0.0.0.0", alias="WEB_HOST")
     web_port: int = Field(default=8000, alias="WEB_PORT")
     public_base_url: str = Field(default="http://localhost:8000", alias="PUBLIC_BASE_URL")

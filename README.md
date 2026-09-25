@@ -1,6 +1,6 @@
 # 🎵 PlayMyStation
 
-Асинхронный мультиаккаунтный Telegram-бот: **Spotify + Яндекс Музыка + SoundCloud** в одном `/now`.
+Асинхронный мультиаккаунтный Telegram-бот: **Spotify + Яндекс Музыка + SoundCloud + Last.fm** в одном `/now`.
 
 ## Стек
 Python 3.11+ · aiogram 3.x · FastAPI (OAuth callbacks) · SQLAlchemy 2.0 Async + PostgreSQL ·
@@ -39,12 +39,12 @@ python -m app.main
 `/now`: если `all` — `asyncio.gather` по всем привязанным, приоритет треку с `is_playing=True`.
 
 ## Ограничения API (честно)
-- **Spotify** — полноценный realtime (`currently-playing` + авторефреш токена), но:
-  - приложение в Development Mode требует **Premium на аккаунте-владельце приложения** (иначе все user-запросы → `403`, см. [quota modes](https://developer.spotify.com/documentation/web-api/concepts/quota-modes));
+- **Spotify** — полноценный realtime (`currently-playing` + авторефреш токена), но:  - приложение в Development Mode требует **Premium на аккаунте-владельце приложения** (иначе все user-запросы → `403`, см. [quota modes](https://developer.spotify.com/documentation/web-api/concepts/quota-modes));
   - free-аккаунты получают `403` на realtime player API — бот падает назад на `recently-played` («последний трек»);
   - больше 5 пользователей — только через allowlist (User Management) или Extended Quota (только для организаций).
 - **Яндекс** — нет `currently playing` в API → читаем очередь (`queues_list`), прогресс недоступен.
 - **SoundCloud** — нет realtime → `play-history` / фолбэк `favorites`, помечаем как «последний трек».
+- **Last.fm** — `user.getrecenttracks` по username (OAuth не нужен, Premium не нужен); трек с флагом `nowplaying` считаем играющим, иначе «последний трек». Выход для free-юзеров Spotify через скробблинг.
 
 ## CI/CD & Deploy
 

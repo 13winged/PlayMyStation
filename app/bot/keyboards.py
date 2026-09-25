@@ -8,6 +8,7 @@ PROVIDER_META: dict[str, tuple[str, str]] = {
     "spotify": ("Spotify", "🟢"),
     "yandex": ("Яндекс Музыка", "🔴"),
     "soundcloud": ("SoundCloud", "🟠"),
+    "lastfm": ("Last.fm", "🟪"),
 }
 
 
