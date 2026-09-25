@@ -1,5 +1,6 @@
 """FastAPI-приложение (OAuth callbacks + healthcheck + webhook)."""
 
+import logging
 from contextlib import asynccontextmanager
 
 from aiogram import Bot, Dispatcher
@@ -8,6 +9,8 @@ from fastapi import FastAPI, Header, HTTPException, Request
 
 from app.core.config import get_settings
 from app.web.oauth import router as oauth_router
+
+log = logging.getLogger("playmystation.web")
 
 # Глобальные instances для webhook (устанавливаются в main.py)
 _bot: Bot | None = None
@@ -72,8 +75,7 @@ def create_web_app() -> FastAPI:
             try:
                 await dp.feed_update(bot, update)
             except Exception as e:
-                import logging
-                logging.exception("Error processing update")
+                log.exception("Error processing update")
                 raise HTTPException(status_code=500, detail=f"Error processing update: {e}")
             return {"ok": True}
 

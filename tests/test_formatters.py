@@ -97,3 +97,19 @@ def test_track_card_without_optional_fields() -> None:
     assert "Artist" in card
     assert "Album" not in card
     assert "--:-- / --:--" not in card  # нет duration
+
+
+def test_track_card_escapes_html() -> None:
+    track = TrackDTO(
+        title='Test <provider> & "song"',
+        artist="Artist <b>hack</b>",
+        album="Album <i>x</i>",
+        track_url='https://example.com/track?a=1&b=2"x',
+        provider="spotify",
+        is_playing=True,
+    )
+    card = track_card(track)
+    assert "<provider>" not in card
+    assert "&lt;provider&gt;" in card
+    assert "<b>hack</b>" not in card
+    assert "&lt;b&gt;hack&lt;/b&gt;" in card
