@@ -10,6 +10,8 @@
 from __future__ import annotations
 
 import datetime as dt
+import html
+import logging
 
 import httpx
 from aiogram import Router
@@ -23,6 +25,8 @@ from app.db import repositories as repo
 from app.db.models import User
 
 router = Router()
+
+log = logging.getLogger("playmystation.spotify_auth")
 
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 
@@ -59,9 +63,22 @@ async def cmd_spotify(
             auth=(settings.spotify_client_id, settings.spotify_client_secret),
         )
     if resp.status_code != 200:
+        # Spotify возвращает JSON вида {"error": "...", "error_description": "..."}.
+        # Пишем полный ответ в лог, пользователю показываем только описание
+        # (секретов там нет) — иначе причину отклонения не диагностировать.
+        try:
+            err = resp.json()
+            err_desc = err.get("error_description") or err.get("error") or resp.text
+        except Exception:  # noqa: BLE001 — не-JSON ответ
+            err_desc = resp.text
+        log.warning("Spotify token exchange failed: %s %s", resp.status_code, resp.text)
+        safe_desc = html.escape(err_desc[:300], quote=False)
         await message.answer(
-            "❌ Spotify отклонил код (он одноразовый и живёт ~10 минут).\n"
-            "Пройди авторизацию заново и пришли свежий код."
+            "❌ Spotify отклонил код.\n"
+            f"Причина: <code>{safe_desc}</code>\n\n"
+            "Чаще всего это несовпадение redirect_uri: в обмене должен быть "
+            "точно тот же URI, что в ссылке авторизации. Проверь "
+            "SPOTIFY_REDIRECT_URI в настройках сервера."
         )
         return
 
