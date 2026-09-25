@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import logging
 from collections.abc import Awaitable, Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,8 @@ from app.services.soundcloud import SoundCloudService
 from app.services.spotify import SpotifyService
 from app.services.yandex import YandexMusicService
 
+log = logging.getLogger("playmystation.factory")
+
 # Bulkhead: максимум времени на один сервис. Медленный/зависший провайдер
 # отваливается по таймауту и не задерживает ответ /now для остальных.
 NOW_PLAYING_TIMEOUT = 10.0
@@ -24,9 +27,16 @@ NOW_PLAYING_TIMEOUT = 10.0
 async def _safe_get_playing(service: BaseMusicService) -> TrackDTO | None:
     """Опрос одного сервиса с таймаутом. Любая ошибка/таймаут → None."""
     try:
-        return await asyncio.wait_for(service.get_currently_playing(), timeout=NOW_PLAYING_TIMEOUT)
+        track = await asyncio.wait_for(service.get_currently_playing(), timeout=NOW_PLAYING_TIMEOUT)
     except (TimeoutError, Exception):  # noqa: BLE001 — один сервис не должен ронять /now
+        log.info("provider %s failed/timeout", service.provider)
         return None
+    log.info(
+        "provider %s -> %s",
+        service.provider,
+        f"'{track.title}'" if track else None,
+    )
+    return track
 
 
 async def build_service(

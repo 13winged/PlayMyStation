@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import datetime as dt
+import logging
 from collections.abc import Awaitable, Callable
 
 import httpx
@@ -12,6 +13,8 @@ import httpx
 from app.core.config import get_settings
 from app.core.retry import SPOTIFY_CIRCUIT, create_retry_transport
 from app.services.base import BaseMusicService, TrackDTO
+
+log = logging.getLogger("playmystation.spotify")
 
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 NOW_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
@@ -144,21 +147,30 @@ class SpotifyService(BaseMusicService):
             if e.response is not None and e.response.status_code == 401 and self._refresh_token and await self._refresh():
                 return await self.get_currently_playing()
             # Circuit breaker open или другая ошибка
+            log.info("currently-playing request failed: %s", e)
             return None
 
         if resp.status_code == 204:
+            log.info("currently-playing: 204 No Content (nothing playing)")
             return None  # ничего не играет, 204 No Content
         if resp.status_code == 401 and self._refresh_token:
+            log.info("currently-playing: 401, trying token refresh")
             if await self._refresh():
                 return await self.get_currently_playing()
+            log.warning("currently-playing: 401 and refresh failed")
             return None
         if resp.status_code != 200:
+            log.info("currently-playing: unexpected status %s", resp.status_code)
             return None
 
         data = resp.json()
         item = data.get("item") or {}
         artists = ", ".join(a.get("name", "") for a in item.get("artists", [])) or "Unknown artist"
         images = (item.get("album") or {}).get("images") or []
+        log.info(
+            "currently-playing: '%s' — %s (is_playing=%s)",
+            item.get("name"), artists, data.get("is_playing"),
+        )
         return TrackDTO(
             title=item.get("name", "Unknown title"),
             artist=artists,
