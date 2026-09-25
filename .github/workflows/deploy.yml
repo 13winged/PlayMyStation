@@ -40,6 +40,8 @@ jobs:
             fi
             printf '%s' "$ENV_PROD" > .env
             export DOMAIN
+            # Stop and remove existing containers to avoid name conflicts
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml down --remove-orphans
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
             docker system prune -f
             # Wait for app to be ready with retries
