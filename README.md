@@ -10,8 +10,9 @@ Redis · httpx · yandex-music · Docker Compose
 ```bash
 cp .env.example .env        # заполнить BOT_TOKEN, FERNET_KEY, OAuth-клиенты
 docker compose up --build
-# бот: polling Telegram; web: http://localhost:8000/health
+# бот: polling Telegram (или webhook, если задан WEBHOOK_URL); web: http://localhost:8000/health
 # OAuth: /oauth/spotify/callback, /oauth/soundcloud/callback
+# Миграции Alembic применяются автоматически при старте приложения
 ```
 
 Локально без Docker:
@@ -23,12 +24,15 @@ python -m app.main
 
 ## Архитектура
 - `app/db/models.py` — `users` (telegram_id, active_provider) + `integrations` (UniqueConstraint user+provider)
+- `alembic/versions/` — миграции БД (применяются при старте, вместо `create_all`)
 - `app/services/base.py` — `TrackDTO` + `BaseMusicService.get_currently_playing()`
 - `app/services/spotify.py | yandex.py | soundcloud.py` — 3 стратегии
-- `app/services/factory.py` — `build_service()` + `resolve_now_playing()` (режим `all` опрашивает всё параллельно)
-- `app/bot/` — хэндлеры `/start /services /now /np /yandex`, клавиатуры, `track_card()` с прогресс-баром
+- `app/services/factory.py` — `build_service()` + `resolve_now_playing()` (режим `all` опрашивает всё параллельно, приоритет `is_playing=True`); результат кешируется в Redis на ~20 сек
+- `app/core/retry.py` — ретраи httpx (exponential backoff, `Retry-After`) + circuit-breaker для внешних API
+- `app/bot/` — хэндлеры `/start /services /now /np /yandex /disconnect`, клавиатуры, `track_card()` с прогресс-баром (весь динамический текст экранируется под Telegram HTML)
 - `app/web/oauth.py` — OAuth2 callbacks (state=telegram_id), обмен code→token, upsert в БД
-- `app/main.py` — polling + uvicorn в одном asyncio-процессе
+- `app/web/app.py` — FastAPI: `/health`, OAuth callbacks, `POST /webhook` (проверка `X-Telegram-Bot-Api-Secret-Token`)
+- `app/main.py` — dual-режим: **polling** (по умолчанию) или **webhook** (если задан `WEBHOOK_URL`); graceful shutdown, `delete_webhook` при старте polling-режима
 
 ## Мультиаккаунтинг
 У пользователя **по одному аккаунту каждого провайдера**. `active_provider ∈ {spotify, yandex, soundcloud, all}`.
@@ -63,10 +67,11 @@ GitHub Secrets (репозиторий → Settings → Secrets and variables �
 | `SSH_HOST` | IP сервера, напр. `45.86.66.95` |
 | `SSH_PORT` | `22` |
 | `SSH_USER` | пользователь на сервере |
-| `SSH_PRIVATE_KEY` | приватный ключ деплоя целиком |
-| `GH_PAT` | fine-grained PAT с `contents:read` на этот репозиторий (нужен для `git clone/pull` приватного репо) |
+| `SSH_PRIVATE_KEY` | приватный ключ деплоя целиком (без passphrase) |
 | `DOMAIN` | домен, напр. `music.example.com` (A-запись → IP сервера) |
 | `ENV_PROD` | содержимое прод-`.env` целиком (см. ниже) |
+
+Деплой ходит в Git по SSH, поэтому на сервере нужен доступ к GitHub: публичный ключ пользователя деплоя добавить в репозиторий → Settings → Deploy keys (с ✅ Allow write access).
 
 `ENV_PROD` (шаблон):
 ```
@@ -77,12 +82,27 @@ REDIS_URL=redis://redis:6379/0
 SPOTIFY_CLIENT_ID=...
 SPOTIFY_CLIENT_SECRET=...
 SPOTIFY_REDIRECT_URI=https://<DOMAIN>/oauth/spotify/callback
+SOUNDCLOUD_CLIENT_ID=...
+SOUNDCLOUD_CLIENT_SECRET=...
+SOUNDCLOUD_REDIRECT_URI=https://<DOMAIN>/oauth/soundcloud/callback
 PUBLIC_BASE_URL=https://<DOMAIN>
 WEB_HOST=0.0.0.0
 WEB_PORT=8000
+# Webhook-режим (опционально; без WEBHOOK_URL бот работает в polling-режиме):
+WEBHOOK_URL=https://<DOMAIN>/webhook
+WEBHOOK_SECRET=<случайная строка 32+ символов>
+WEBHOOK_PATH=/webhook
 ```
 
 ⚠️ **Важно про Spotify**: Redirect URI, отличные от `localhost`, обязаны быть `https` — иначе Spotify их отклонит. Поэтому прод требует **домен + Caddy** (уже в compose). После деплоя добавь `https://<DOMAIN>/oauth/spotify/callback` в Spotify Dashboard → Settings → Redirect URIs.
+
+## Эксплуатация (выученные уроки)
+
+- **Никогда `docker compose down -v` на проде**: сносит volume `pgdata` (все пользователи и интеграции) и `caddy_data` (Let's Encrypt сертификаты → TLS ляжет + rate limit на перевыпуск). Деплой-скрипт чистит только контейнеры и дублирующиеся сети, volumes не трогает.
+- **Дубли сетей**: после упавших деплоев могут остаться две сети `playmystation_default` (`network ... is ambiguous`). Чинятся удалением по ID: `docker network ls --filter name=playmystation -q | xargs -r docker network rm` (уже встроено в deploy).
+- **Миграции Alembic — в git**: `alembic/versions/*.py` обязаны коммититься, иначе `upgrade head` на сервере — no-op и таблиц не будет (`relation "users" does not exist`).
+- **Telegram HTML**: любой динамический текст (названия треков!) и плейсхолдеры (`<provider>`, `<токен>`) экранировать (`&lt;...&gt;`, `html.escape`), иначе `Bad Request: can't parse entities` и 500 на каждый апдейт.
+- **Webhook vs polling**: без `WEBHOOK_URL` бот работает в polling (входящий https не нужен). Возврат на webhook — добавить `WEBHOOK_URL`/`WEBHOOK_SECRET` в `ENV_PROD` + деплой.
 
 ## Карта разработки
 См. [ROADMAP.md](./ROADMAP.md).

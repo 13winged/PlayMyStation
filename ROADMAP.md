@@ -1,7 +1,7 @@
 # 🗺️ Карта разработки PlayMyStation
 
 ## Легенда статусов
-- ✅ Готово (этот scaffold) · 🔄 В работе · ⬜ Запланировано
+- ✅ Готово · 🔄 В работе · ⬜ Запланировано
 
 ## Milestone 0 — MVP scaffold ✅
 - [x] Модели `users` + `integrations` (UniqueConstraint user+provider)
@@ -10,12 +10,12 @@
 - [x] FastAPI OAuth callbacks Spotify/SoundCloud, шифрование токенов (Fernet)
 - [x] `docker-compose`: postgres + redis + app; `app/main.py` (polling + uvicorn)
 
-## Milestone 1 — Auth & надежность 🔄
-- [ ] Alembic-миграции (сейчас `create_all` для MVP)
-- [ ] RedisStorage для FSM + кеш `now_playing` на 15–30 сек (защита от спама /now)
-- [ ] Обработка Spotify 429/expired, ретраи httpx, circuit-breaker
-- [ ] Удаление сообщений с Яндекс-токеном + команда `/disconnect <provider>`
-- [ ] Тесты: `track_card`, `factory` (моки сервисов), репозитории (sqlite+aiosqlite)
+## Milestone 1 — Auth & надежность ✅
+- [x] Alembic-миграции (применяются при старте; миграции трекаются в git)
+- [x] RedisStorage для FSM + кеш `now_playing` ~20 сек (защита от спама /now)
+- [x] Обработка Spotify 429/expired: ретраи httpx (backoff + `Retry-After`), circuit-breaker
+- [x] Удаление сообщений с Яндекс-токеном + команда `/disconnect <provider>`
+- [x] Тесты: `track_card` (в т.ч. экранирование HTML), `factory` (моки сервисов), репозитории (sqlite+aiosqlite) — 34 passed
 
 ## Milestone 2 — UX
 - [ ] Кнопки ⏯ ⏭ ⏮ (Spotify API control) + автообновление карточки /now каждые N сек
@@ -24,13 +24,19 @@
 - [ ] Локализация RU/EN
 
 ## Milestone 3 — Продакшн
-- [ ] Webhook вместо polling (сертификат, секрет), graceful shutdown
+- [x] Webhook-режим (сертификат, секрет) + dual polling/webhook + graceful shutdown
+- [x] CI (ruff/pytest/docker build) + CD на VPS через GitHub Actions (SSH + Deploy Key) + Caddy (https)
 - [ ] Метрики Prometheus + Sentry, структурированные логи (structlog)
-- [x] CI (ruff/pytest/docker build) + CD на VPS через GitHub Actions + Caddy (https)
 - [ ] Бэкапы Postgres
 - [ ] Ротация Fernet-ключей, audit-log подключений
+
+## Текущий статус прода (2026-09-25)
+- Бот работает в **polling-режиме** (временно).
+- Webhook отключён до **2026-09-27 00:54 UTC**: Let's Encrypt rate limit (5 сертификатов/нед — съедены перевыпусками после `down -v`). Возврат: добавить `WEBHOOK_URL`/`WEBHOOK_SECRET` в `ENV_PROD` + деплой.
+- Прод: `https://hissihyss2.com`, Caddy + авто-https, PostgreSQL + Redis в compose.
 
 ## Риски
 1. Яндекс: неофициальный API, токены короткоживущие → вынести в отдельный воркер с `asyncio.to_thread`.
 2. SoundCloud: нет realtime → честный UX «последний трек», не обещать live.
 3. Spotify: квоты/скоупы → запрашивать минимум (`user-read-currently-playing user-read-playback-state`).
+4. Деплой: не использовать `down -v` (сносит БД и сертификаты); миграции Alembic всегда коммитить.
