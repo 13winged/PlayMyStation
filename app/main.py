@@ -93,6 +93,9 @@ async def delete_webhook(bot: Bot) -> None:
 async def run_polling(bot: Bot, dp: Dispatcher) -> None:
     """Запуск бота в режиме polling."""
     log.info("Starting bot in POLLING mode")
+    # Если раньше стоял webhook — снимаем, иначе Telegram продолжит слать
+    # апдейты на URL вместо выдачи через getUpdates.
+    await bot.delete_webhook(drop_pending_updates=True)
     await get_redis()
     await dp.start_polling(bot)
 
