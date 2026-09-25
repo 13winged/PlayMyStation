@@ -23,6 +23,17 @@
 - [ ] Уведомления «друг слушает»: подписки на друзей, дайджест
 - [ ] Локализация RU/EN
 
+## Milestone 4 — По мотивам es3n1n/nowplaying (свой код, не форк)
+- [ ] **Last.fm-провайдер** (`user.getrecenttracks`, только username + API key) — рабочий `/now` для free-юзеров без Premium где бы то ни было
+- [ ] **Флаги возможностей платформы** (`PLAY/LIKE/QUEUE`) — эволюция `BaseMusicService` под управление воспроизведением
+- [ ] **Ynison-realtime для Яндекса** — портировать gRPC-клиент нативного протокола вместо эвристики по очереди
+- [ ] **song.link-матчинг** — кнопки «открыть этот же трек на …» в карточке
+- [ ] **Кеш аудио через Telegram-канал** — скачанное отправляется в приватный канал, повторная отдача по `file_id`
+- [ ] Скачивание полных треков — **отклонено**: оценён открытый uDownloader/yt-dlp
+  (`song.link`-матчинг → yt-dlp → кеш-канал), но скачивание с YouTube нарушает его ToS,
+  риски несёт владелец. Остаёмся на легальном: Spotify `preview_url` + SoundCloud
+  `download_url` (подробности в README). Пересмотр — только осознанным решением владельца
+
 ## Milestone 3 — Продакшн
 - [x] Webhook-режим (сертификат, секрет) + dual polling/webhook + graceful shutdown
 - [x] CI (ruff/pytest/docker build) + CD на VPS через GitHub Actions (SSH + Deploy Key) + Caddy (https)

@@ -100,12 +100,35 @@ WEBHOOK_PATH=/webhook
 ⚠️ **Важно про Spotify**: Redirect URI, отличные от `localhost`, обязаны быть `https` — иначе Spotify их отклонит. Поэтому прод требует **домен + Caddy** (уже в compose). После деплоя добавь `https://<DOMAIN>/oauth/spotify/callback` в Spotify Dashboard → Settings → Redirect URIs.
 
 ## Эксплуатация (выученные уроки)
-
 - **Никогда `docker compose down -v` на проде**: сносит volume `pgdata` (все пользователи и интеграции) и `caddy_data` (Let's Encrypt сертификаты → TLS ляжет + rate limit на перевыпуск). Деплой-скрипт чистит только контейнеры и дублирующиеся сети, volumes не трогает.
 - **Дубли сетей**: после упавших деплоев могут остаться две сети `playmystation_default` (`network ... is ambiguous`). Чинятся удалением по ID: `docker network ls --filter name=playmystation -q | xargs -r docker network rm` (уже встроено в deploy).
 - **Миграции Alembic — в git**: `alembic/versions/*.py` обязаны коммититься, иначе `upgrade head` на сервере — no-op и таблиц не будет (`relation "users" does not exist`).
 - **Telegram HTML**: любой динамический текст (названия треков!) и плейсхолдеры (`<provider>`, `<токен>`) экранировать (`&lt;...&gt;`, `html.escape`), иначе `Bad Request: can't parse entities` и 500 на каждый апдейт.
 - **Webhook vs polling**: без `WEBHOOK_URL` бот работает в polling (входящий https не нужен). Возврат на webhook — добавить `WEBHOOK_URL`/`WEBHOOK_SECRET` в `ENV_PROD` + деплой.
+
+## Вдохновлено и отличие от референса
+
+Архитектурным ориентиром служит [es3n1n/nowplaying](https://github.com/es3n1n/nowplaying)
+(`playinnowbot`, Apache-2.0, архив с 02.2026) — мультиплатформенный бот
+(Spotify / Yandex / Last.fm / Apple / SoundCloud) с управлением воспроизведением.
+
+Осознанно **не форкаем**, а переносим идеи в собственную кодовую базу:
+- взято как образец: богатый интерфейс платформы (флаги возможностей + `play/queue/like`),
+  Last.fm как источник данных, Ynison для честного realtime Яндекса, кеш треков через
+  Telegram-канал, матчинг через `song.link`;
+- не берём: закрытый µdownloader (скачивание с YouTube — не опенсорс по юридическим
+  причинам), собственный сервер Bot API, frontend + браузерное расширение для авторизации;
+- уже лучше референса: мультиаккаунтный ALL-режим, recently-played фолбэки,
+  dual polling/webhook, русская локализация сообщений.
+
+### Почему нет скачивания полных треков (uDownloader, yt-dlp)
+
+Оценено: открытый [uDownloader](https://github.com/bolablg/uDownloader) (MIT) — это
+враппер над `yt-dlp`, технически связка «`song.link`-матчинг → yt-dlp → кеш в Telegram-канале»
+реализуема. Решение: **не делаем** — скачивание с YouTube нарушает его ToS, риски
+(жалобы правообладателей, бан Bot-токена) несёт владелец VPS/бота. Вместо этого —
+только легальное: 30-секундные `preview_url` Spotify и `download_url` SoundCloud
+там, где автор разрешил скачивание. Пересмотреть можно осознанным решением владельца.
 
 ## Карта разработки
 См. [ROADMAP.md](./ROADMAP.md).

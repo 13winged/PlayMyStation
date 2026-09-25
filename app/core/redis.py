@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import asdict
 
 import redis.asyncio as redis
 
@@ -54,10 +55,11 @@ async def set_cached_now_playing(telegram_id: int, track: TrackDTO) -> None:
     """Закэшировать трек на NOW_PLAYING_TTL секунд."""
     r = await get_redis()
     try:
+        # NOTE: TrackDTO — slots-датакласс, у него нет __dict__, поэтому asdict().
         await r.setex(
             _now_playing_key(telegram_id),
             NOW_PLAYING_TTL,
-            json.dumps(track.__dict__, default=str),
+            json.dumps(asdict(track), default=str),
         )
     except Exception:  # noqa: BLE001 — кэш best-effort
         log.debug("Failed to cache now_playing for %s", telegram_id)
