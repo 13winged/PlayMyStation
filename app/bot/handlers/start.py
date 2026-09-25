@@ -139,7 +139,10 @@ async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> 
     if provider == "spotify":
         url = sp_auth_url(state=str(cb.from_user.id))
         await cb.message.edit_text(
-            "🟢 <b>Подключение Spotify</b>\nНажми кнопку и подтверди доступ.",
+            "🟢 <b>Подключение Spotify</b>\nНажми кнопку и подтверди доступ.\n\n"
+            "Если страница колбэка не откроется — скопируй параметр "
+            "<code>code=...</code> из адресной строки и пришли командой "
+            "<code>/spotify &lt;код&gt;</code>.",
             reply_markup=connect_kb(provider, url),
         )
     elif provider == "soundcloud":

@@ -19,6 +19,7 @@ from alembic.config import Config
 
 from alembic import command
 from app.bot.handlers import now as now_handlers
+from app.bot.handlers import spotify_auth as spotify_handlers
 from app.bot.handlers import start as start_handlers
 from app.bot.handlers import yandex_auth as yandex_handlers
 from app.bot.middlewares import DbSessionMiddleware, EnsureUserMiddleware
@@ -58,7 +59,12 @@ def create_dispatcher() -> Dispatcher:
     dp.callback_query.middleware(DbSessionMiddleware(SessionFactory))
     dp.message.middleware(EnsureUserMiddleware())
     dp.callback_query.middleware(EnsureUserMiddleware())
-    dp.include_routers(start_handlers.router, now_handlers.router, yandex_handlers.router)
+    dp.include_routers(
+        start_handlers.router,
+        now_handlers.router,
+        yandex_handlers.router,
+        spotify_handlers.router,
+    )
     return dp
 
 
