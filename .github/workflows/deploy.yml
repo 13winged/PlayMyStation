@@ -24,6 +24,11 @@ jobs:
           envs: ENV_PROD,DOMAIN
           script: |
             set -e
+            mkdir -p ~/.ssh
+            # Add GitHub to known_hosts to avoid "Host key verification failed"
+            ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+            chmod 644 ~/.ssh/known_hosts
+
             mkdir -p ~/playmystation
             cd ~/playmystation
             if [ -d .git ]; then
