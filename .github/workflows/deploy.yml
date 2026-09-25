@@ -27,6 +27,8 @@ jobs:
             mkdir -p ~/playmystation
             cd ~/playmystation
             if [ -d .git ]; then
+              # Force SSH remote in case it was HTTPS from old deploys
+              git remote set-url origin git@github.com:13winged/PlayMyStation.git
               git pull --ff-only
             else
               git clone "git@github.com:13winged/PlayMyStation.git" .
