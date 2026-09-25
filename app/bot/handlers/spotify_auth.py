@@ -35,8 +35,8 @@ TOKEN_URL = "https://accounts.spotify.com/api/token"
 async def cmd_spotify(
     message: Message, command: CommandObject, session: AsyncSession, db_user: User
 ) -> None:
-    code = (command.args or "").strip().strip('"').strip("'").split()[0] if command.args else ""
-    if not code:
+    raw_args = (command.args or "").strip()
+    if not raw_args:
         await message.answer(
             "🟢 Пришли код так:\n<code>/spotify &lt;код_из_адресной_строки&gt;</code>\n\n"
             "Где взять код:\n"
@@ -45,6 +45,14 @@ async def cmd_spotify(
             "3. Скопируй значение параметра <code>code=...</code> из адресной строки\n"
             "4. Пришли его этой командой (код одноразовый, живёт ~10 минут)"
         )
+        return
+    # Пользователь может вставить целую callback-ссылку — вытаскиваем code=.
+    code = raw_args
+    if "code=" in raw_args:
+        code = raw_args.split("code=", 1)[1].split("&")[0].split()[0]
+    code = code.strip().strip('"').strip("'")
+    if not code:
+        await message.answer("❌ Не нашёл код. Пришли <code>/spotify &lt;код&gt;</code>.")
         return
 
     settings = get_settings()
