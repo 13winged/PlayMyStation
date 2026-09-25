@@ -15,6 +15,13 @@ services:
     ports:
       - "6379:6379"
 
+  # Go-сайдкар: транспорт для gRPC-стримов нативного протокола
+  # Яндекс Музыки (Ynison). Слушает только внутри compose-сети.
+  ynison:
+    build: ./ynison-proxy
+    expose:
+      - "50051"
+
   app:
     build: .
     env_file: .env
