@@ -1,14 +1,15 @@
-"""Хэндлеры /start и /services — точка входа в мультиаккаунтинг."""
+"""Хэндлеры /start, /services, /disconnect — точка входа в мультиаккаунтинг."""
 
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards import connect_kb, services_kb
 from app.core.config import get_settings
+from app.core.redis import invalidate_now_playing_cache
 from app.db import repositories as repo
 from app.db.models import User
 from app.services.soundcloud import build_authorize_url as sc_auth_url
@@ -31,7 +32,8 @@ async def cmd_start(message: Message, session: AsyncSession, db_user: User) -> N
         "Выбери активный сервис или режим <b>ALL</b> — тогда /now найдёт тот, где музыка играет прямо сейчас.\n\n"
         "Команды:\n"
         "• /services — подключить / выбрать сервис\n"
-        "• /now или /np — что сейчас играет",
+        "• /now или /np — что сейчас играет\n"
+        "• /disconnect <provider> — отключить сервис",
         reply_markup=services_kb(bound, active),
     )
 
@@ -43,6 +45,47 @@ async def cmd_services(message: Message, session: AsyncSession, db_user: User) -
     await message.answer(
         "⚙️ <b>Мои сервисы</b>\nНажми на сервис, чтобы подключить / отключить. "
         "Второй ряд — выбор активного для /now.",
+        reply_markup=services_kb(bound, active),
+    )
+
+
+@router.message(Command("disconnect"))
+async def cmd_disconnect(
+    message: Message, command: CommandObject, session: AsyncSession, db_user: User
+) -> None:
+    """Отключить сервис: /disconnect spotify|yandex|soundcloud"""
+    provider = (command.args or "").strip().lower()
+    valid_providers = ("spotify", "yandex", "soundcloud")
+
+    if provider not in valid_providers:
+        await message.answer(
+            f"❌ Укажи провайдера: <code>/disconnect {valid_providers[0]}</code>\n"
+            f"Доступные: {', '.join(valid_providers)}"
+        )
+        return
+
+    integrations = await repo.list_integrations(session, db_user.id)
+    bound = {i.provider for i in integrations}
+
+    if provider not in bound:
+        await message.answer(f"ℹ️ {provider.capitalize()} не был подключен.")
+        return
+
+    await repo.delete_integration(session, db_user.id, provider)
+    await session.commit()
+
+    # Если отключали активный провайдер — сбрасываем на "all"
+    if db_user.active_provider == provider:
+        await repo.set_active_provider(session, db_user, "all")
+        await session.commit()
+
+    # Инвалидируем кэш now_playing
+    await invalidate_now_playing_cache(db_user.telegram_id)
+
+    integrations = await repo.list_integrations(session, db_user.id)
+    bound, active = _bound_and_active(db_user, integrations)
+    await message.answer(
+        f"✅ {provider.capitalize()} отключён.",
         reply_markup=services_kb(bound, active),
     )
 
@@ -77,6 +120,15 @@ async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> 
         # Отключаем
         await repo.delete_integration(session, db_user.id, provider)
         await session.commit()
+
+        # Если отключали активный — сброс на all
+        if db_user.active_provider == provider:
+            await repo.set_active_provider(session, db_user, "all")
+            await session.commit()
+
+        # Инвалидируем кэш
+        await invalidate_now_playing_cache(cb.from_user.id)
+
         await cb.answer(f"{provider} отключён")
         integrations = await repo.list_integrations(session, db_user.id)
         bound, active = _bound_and_active(db_user, integrations)
@@ -105,7 +157,7 @@ async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> 
             "1. Открой relay: <code>https://yandex-music-auth.vercel.app</code> (или получи токен любым способом)\n"
             "2. Скопируй OAuth-токен Яндекса\n"
             "3. Отправь его следующим сообщением с командой:\n"
-            "<code>/yandex &lt;токен&gt;</code>\n\n"
+            "<code>/yandex <токен></code>\n\n"
             "Токен хранится в зашифрованном виде и используется только для чтения очереди."
         )
     await cb.answer()
