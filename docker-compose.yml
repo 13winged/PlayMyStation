@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: playmystation
+      POSTGRES_PASSWORD: playmystation
+      POSTGRES_DB: playmystation
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  app:
+    build: .
+    env_file: .env
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:
