@@ -40,8 +40,11 @@ jobs:
             fi
             printf '%s' "$ENV_PROD" > .env
             export DOMAIN
-            # Stop and remove existing containers and network to avoid conflicts
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml down --remove-orphans -v
+            # Stop and remove existing containers, network and volumes to avoid conflicts
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml down --remove-orphans -v --rmi local
+            # Force remove any leftover containers
+            docker rm -f playmystation-app-1 playmystation-postgres-1 playmystation-redis-1 playmystation-caddy-1 2>/dev/null || true
+            docker network rm playmystation_default 2>/dev/null || true
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
             docker system prune -f
             # Wait for app to be ready with retries
