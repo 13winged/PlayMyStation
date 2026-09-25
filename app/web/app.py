@@ -2,15 +2,16 @@
 
 from contextlib import asynccontextmanager
 
-from aiogram import Bot
+from aiogram import Bot, Dispatcher
 from aiogram.types import Update
 from fastapi import FastAPI, Header, HTTPException, Request
 
 from app.core.config import get_settings
 from app.web.oauth import router as oauth_router
 
-# Глобальный bot instance для webhook (устанавливается в main.py)
+# Глобальные instances для webhook (устанавливаются в main.py)
 _bot: Bot | None = None
+_dispatcher: Dispatcher | None = None
 
 
 def set_webhook_bot(bot: Bot) -> None:
@@ -19,8 +20,18 @@ def set_webhook_bot(bot: Bot) -> None:
     _bot = bot
 
 
+def set_webhook_dispatcher(dp: Dispatcher) -> None:
+    """Установить dispatcher instance для webhook handler."""
+    global _dispatcher
+    _dispatcher = dp
+
+
 def get_webhook_bot() -> Bot | None:
     return _bot
+
+
+def get_webhook_dispatcher() -> Dispatcher | None:
+    return _dispatcher
 
 
 @asynccontextmanager
@@ -51,13 +62,14 @@ def create_web_app() -> FastAPI:
                 raise HTTPException(status_code=403, detail="Invalid secret token")
 
             bot = get_webhook_bot()
-            if bot is None:
-                raise HTTPException(status_code=500, detail="Bot not initialized")
+            dp = get_webhook_dispatcher()
+            if bot is None or dp is None:
+                raise HTTPException(status_code=500, detail="Bot or dispatcher not initialized")
 
             # Парсим update и передаём в dispatcher
             data = await request.json()
             update = Update.model_validate(data, context={"bot": bot})
-            await bot.dispatcher.feed_update(bot, update)
+            await dp.feed_update(bot, update)
             return {"ok": True}
 
     return app

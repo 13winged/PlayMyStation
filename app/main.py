@@ -26,7 +26,7 @@ from app.core.config import get_settings
 from app.core.db import SessionFactory
 from app.core.redis import close_redis, get_redis
 from app.services.spotify import close_spotify_client
-from app.web.app import create_web_app, set_webhook_bot
+from app.web.app import create_web_app, set_webhook_bot, set_webhook_dispatcher
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("playmystation")
@@ -155,8 +155,9 @@ async def main() -> None:
     )
     dp = create_dispatcher()
 
-    # Регистрируем bot в web app для webhook handler
+    # Регистрируем bot и dispatcher в web app для webhook handler
     set_webhook_bot(bot)
+    set_webhook_dispatcher(dp)
 
     try:
         if settings.use_webhook:
