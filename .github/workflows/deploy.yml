@@ -45,7 +45,11 @@ jobs:
             # Force remove any leftover containers
             docker rm -f playmystation-app-1 playmystation-postgres-1 playmystation-redis-1 playmystation-caddy-1 2>/dev/null || true
             docker network rm playmystation_default 2>/dev/null || true
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+            # Build with cache busting using git commit hash
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            GIT_COMMIT=$(git rev-parse --short HEAD)
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml build --build-arg BUILD_DATE="$BUILD_DATE" --build-arg GIT_COMMIT="$GIT_COMMIT"
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
             docker system prune -f
             # Wait for app to be ready with retries
             for i in {1..30}; do
