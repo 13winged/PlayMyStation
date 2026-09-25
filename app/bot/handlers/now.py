@@ -24,7 +24,9 @@ async def _answer_now(message: Message, session: AsyncSession, db_user: User) ->
             reply_markup=now_empty_kb(),
         )
         return
-    track = await resolve_now_playing(integrations, session, db_user.active_provider or "all")
+    track = await resolve_now_playing(
+        integrations, session, db_user.active_provider or "all", db_user.telegram_id
+    )
     if track is None:
         await message.answer(
             "⏸️ Сейчас ничего не играет (или API не вернуло трек).\n"
@@ -51,7 +53,9 @@ async def cb_now(cb: CallbackQuery, session: AsyncSession, db_user: User) -> Non
     if not integrations:
         await cb.message.answer("❌ Нет привязанных сервисов. Открой /services.")
         return
-    track = await resolve_now_playing(integrations, session, db_user.active_provider or "all")
+    track = await resolve_now_playing(
+        integrations, session, db_user.active_provider or "all", db_user.telegram_id
+    )
     if track is None:
         await cb.message.answer("⏸️ Сейчас ничего не играет.")
         return

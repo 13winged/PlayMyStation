@@ -8,6 +8,7 @@ from collections.abc import Awaitable, Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.redis import get_cached_now_playing, set_cached_now_playing
 from app.db import repositories as repo
 from app.db.models import Integration
 from app.services.base import BaseMusicService, TrackDTO
@@ -61,9 +62,19 @@ async def resolve_now_playing(
     integrations: list[Integration],
     session: AsyncSession,
     active_provider: str = "all",
+    telegram_id: int | None = None,
 ) -> TrackDTO | None:
     """Логика /now: если active != all — опрашиваем один сервис,
-    иначе опрашиваем все привязанные параллельно и возвращаем тот, где is_playing."""
+    иначе опрашиваем все привязанные параллельно и возвращаем тот, где is_playing.
+
+    Использует Redis-кэш (TTL ~20с) для защиты от спама /now.
+    """
+    # Проверяем кэш, если передан telegram_id
+    if telegram_id is not None:
+        cached = await get_cached_now_playing(telegram_id)
+        if cached is not None:
+            return cached
+
     if active_provider != "all":
         targets = [i for i in integrations if i.provider == active_provider]
     else:
@@ -79,16 +90,25 @@ async def resolve_now_playing(
     if not services:
         return None
     if len(services) == 1:
-        return await services[0].get_currently_playing()
+        track = await services[0].get_currently_playing()
+    else:
+        results = await asyncio.gather(
+            *(s.get_currently_playing() for s in services), return_exceptions=True
+        )
+        tracks = [r for r in results if isinstance(r, TrackDTO)]
+        if not tracks:
+            return None
+        # Приоритет: реально играющий трек; иначе первый не-None (last played)
+        track = None
+        for t in tracks:
+            if t.is_playing:
+                track = t
+                break
+        if track is None:
+            track = tracks[0]
 
-    results = await asyncio.gather(
-        *(s.get_currently_playing() for s in services), return_exceptions=True
-    )
-    tracks = [r for r in results if isinstance(r, TrackDTO)]
-    if not tracks:
-        return None
-    # Приоритет: реально играющий трек; иначе первый не-None (last played)
-    for t in tracks:
-        if t.is_playing:
-            return t
-    return tracks[0]
+    # Кэшируем результат
+    if track is not None and telegram_id is not None:
+        await set_cached_now_playing(telegram_id, track)
+
+    return track
