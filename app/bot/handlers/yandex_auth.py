@@ -14,11 +14,24 @@ from app.services.yandex import YandexMusicService
 router = Router()
 
 
+def extract_yandex_token(raw_args: str) -> str:
+    """Извлечь чистый OAuth-токен из ввода пользователя.
+
+    Принимает: голый токен, токен с хвостом `&token_type=...&expires_in=...`,
+    целиком callback-фрагмент (`access_token=...&...`).
+    """
+    token = raw_args.strip().split()[0] if raw_args.strip() else ""
+    if "access_token=" in token:
+        token = token.split("access_token=", 1)[1]
+    token = token.split("&")[0].strip().strip('"').strip("'")
+    return token
+
+
 @router.message(Command("yandex"))
 async def cmd_yandex(
     message: Message, command: CommandObject, session: AsyncSession, db_user: User
 ) -> None:
-    token = (command.args or "").strip().strip('"').strip("'")
+    token = extract_yandex_token(command.args or "")
     if not token:
         await message.answer("🔴 Пришли токен так:\n<code>/yandex &lt;твой_токен&gt;</code>")
         return

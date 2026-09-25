@@ -78,3 +78,15 @@ def test_extract_code_full_url() -> None:
     code, state = extract_code_and_state(url)
     assert code == "AQAxrc3"
     assert state == "762446267"
+
+
+def test_extract_yandex_token_variants() -> None:
+    from app.bot.handlers.yandex_auth import extract_yandex_token
+
+    assert extract_yandex_token("y0_abc123") == "y0_abc123"
+    assert extract_yandex_token("y0_abc123&token_type=bearer&expires_in=1") == "y0_abc123"
+    assert (
+        extract_yandex_token("https://music.yandex.ru/#access_token=y0_abc123&token_type=bearer")
+        == "y0_abc123"
+    )
+    assert extract_yandex_token("") == ""
