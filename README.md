@@ -25,24 +25,26 @@ python -m app.main
 ## Архитектура
 - `app/db/models.py` — `users` (telegram_id, active_provider) + `integrations` (UniqueConstraint user+provider)
 - `alembic/versions/` — миграции БД (применяются при старте, вместо `create_all`)
-- `app/services/base.py` — `TrackDTO` + `BaseMusicService.get_currently_playing()`
-- `app/services/spotify.py | yandex.py | soundcloud.py` — 3 стратегии
+- `app/services/base.py` — `TrackDTO` (+`preview_url`) + `BaseMusicService.get_currently_playing()`
+- `app/services/spotify.py | yandex.py | soundcloud.py | lastfm.py` — 4 стратегии + `audio.py` (скачивание превью с лимитом)
+- `app/services/ynison/` — gRPC-клиент нативного протокола Яндекс Музыки + Go-сайдкар `ynison-proxy/` (realtime: трек + прогресс + пауза)
 - `app/services/factory.py` — `build_service()` + `resolve_now_playing()` (режим `all` опрашивает всё параллельно, приоритет `is_playing=True`); результат кешируется в Redis на ~20 сек
 - `app/core/retry.py` — ретраи httpx (exponential backoff, `Retry-After`) + circuit-breaker для внешних API
-- `app/bot/` — хэндлеры `/start /services /now /np /yandex /disconnect`, клавиатуры, `track_card()` с прогресс-баром (весь динамический текст экранируется под Telegram HTML)
+- `app/bot/` — хэндлеры `/start /services /now /np /yandex /spotify /lastfm /disconnect`, клавиатуры, `track_card()` с прогресс-баром (весь динамический текст экранируется под Telegram HTML); кнопка «⏬ Превью» под карточкой
 - `app/web/oauth.py` — OAuth2 callbacks (state=telegram_id), обмен code→token, upsert в БД
 - `app/web/app.py` — FastAPI: `/health`, OAuth callbacks, `POST /webhook` (проверка `X-Telegram-Bot-Api-Secret-Token`)
 - `app/main.py` — dual-режим: **polling** (по умолчанию) или **webhook** (если задан `WEBHOOK_URL`); graceful shutdown, `delete_webhook` при старте polling-режима
 
 ## Мультиаккаунтинг
-У пользователя **по одному аккаунту каждого провайдера**. `active_provider ∈ {spotify, yandex, soundcloud, all}`.
+У пользователя **по одному аккаунту каждого провайдера**. `active_provider ∈ {spotify, yandex, soundcloud, lastfm, all}`.
 `/now`: если `all` — `asyncio.gather` по всем привязанным, приоритет треку с `is_playing=True`.
 
 ## Ограничения API (честно)
-- **Spotify** — полноценный realtime (`currently-playing` + авторефреш токена), но:  - приложение в Development Mode требует **Premium на аккаунте-владельце приложения** (иначе все user-запросы → `403`, см. [quota modes](https://developer.spotify.com/documentation/web-api/concepts/quota-modes));
+- **Spotify** — полноценный realtime (`currently-playing` + авторефреш токена), но:
+  - приложение в Development Mode требует **Premium на аккаунте-владельце приложения** (иначе все user-запросы → `403`, см. [quota modes](https://developer.spotify.com/documentation/web-api/concepts/quota-modes));
   - free-аккаунты получают `403` на realtime player API — бот падает назад на `recently-played` («последний трек»);
   - больше 5 пользователей — только через allowlist (User Management) или Extended Quota (только для организаций).
-- **Яндекс** — нет `currently playing` в API → читаем очередь (`queues_list`), прогресс недоступен.
+- **Яндекс** — realtime через **Ynison** (нативный протокол: трек + прогресс + пауза, проверено на проде); фолбэк — очередь (`queues_list`, без прогресса). Привязка: `/yandex <токен>` (токен через официальный OAuth implicit flow, relay мёртв).
 - **SoundCloud** — нет realtime → `play-history` / фолбэк `favorites`, помечаем как «последний трек».
 - **Last.fm** — `user.getrecenttracks` по username (OAuth не нужен, Premium не нужен); трек с флагом `nowplaying` считаем играющим, иначе «последний трек». Выход для free-юзеров Spotify через скробблинг.
 
