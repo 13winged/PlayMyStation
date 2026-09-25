@@ -19,6 +19,20 @@ jobs:
       - name: Compile check
         run: python -m compileall -q app
       - name: Tests
+        env:
+          BOT_TOKEN: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+          FERNET_KEY: "ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg="
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          REDIS_URL: "redis://localhost:6379/0"
+          SPOTIFY_CLIENT_ID: "test"
+          SPOTIFY_CLIENT_SECRET: "test"
+          SPOTIFY_REDIRECT_URI: "http://localhost:8000/oauth/spotify/callback"
+          SOUNDCLOUD_CLIENT_ID: "test"
+          SOUNDCLOUD_CLIENT_SECRET: "test"
+          SOUNDCLOUD_REDIRECT_URI: "http://localhost:8000/oauth/soundcloud/callback"
+          WEB_HOST: "0.0.0.0"
+          WEB_PORT: "8000"
+          PUBLIC_BASE_URL: "http://localhost:8000"
         run: python -m pytest -q
 
   docker-build:
