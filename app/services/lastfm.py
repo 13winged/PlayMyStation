@@ -109,7 +109,7 @@ class LastFmService(BaseMusicService):
         )
 
     async def download_track(
-        self, track: TrackDTO, cookie_json: str | None = None
+        self, track: TrackDTO, youtube_auth: str | None = None
     ) -> tuple[bytes, str] | None:
         """Аудио через YouTube-матчинг по метаданным скроббла.
 
@@ -118,4 +118,4 @@ class LastFmService(BaseMusicService):
         """
         if not track.artist or track.artist == "Unknown artist":
             return None
-        return await download_by_query(f"{track.artist} - {track.title}", None, cookie_json)
+        return await download_by_query(f"{track.artist} - {track.title}", None, youtube_auth)

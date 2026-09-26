@@ -39,15 +39,15 @@ class BaseMusicService(ABC):
         raise NotImplementedError
 
     async def download_track(
-        self, track: TrackDTO, cookie_json: str | None = None
+        self, track: TrackDTO, youtube_auth: str | None = None
     ) -> tuple[bytes, str] | None:
         """Скачать полное аудио трека. Возвращает (байты, расширение) или None.
 
         Дефолт — не поддерживается (Last.fm). Переопределяют сервисы,
         у которых есть доступ к аудио: Яндекс (прямые ссылки),
-        YouTube (yt-dlp), Spotify (только 30-сек preview_url).
-        cookie_json — auth-JSON YouTube-привязки: матчинг Spotify/Last.fm
-        качает через него, иначе YouTube банит серверный IP.
+        YouTube (поток/yt-dlp), Spotify (матчинг + 30-сек preview_url).
+        youtube_auth — auth-JSON YouTube-привязки юзера: матчинг Spotify/Last.fm
+        качает через него (OAuth-поток или куки), иначе бан серверного IP.
         """
         return None
 

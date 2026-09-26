@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     # Last.fm: только API-ключ сервера + username юзера (OAuth не нужен)
     lastfm_api_key: str = Field(default="", alias="LASTFM_API_KEY")
 
+    # YouTube Music OAuth (device-flow): Google Cloud Console → YouTube Data API v3
+    # включён → OAuth-клиент типа «TVs and Limited Input devices».
+    ytm_oauth_client_id: str = Field(default="", alias="YTM_OAUTH_CLIENT_ID")
+    ytm_oauth_client_secret: str = Field(default="", alias="YTM_OAUTH_CLIENT_SECRET")
+
     # Кеш аудио: ID приватного канала, куда бот (админ) складывает треки
     # для повторной отдачи по file_id. 0 — кеш канала выключен.
     audio_cache_channel_id: int = Field(default=0, alias="AUDIO_CACHE_CHANNEL_ID")

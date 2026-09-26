@@ -128,3 +128,37 @@ async def set_cached_songlink(source_url: str, links: dict[str, str]) -> None:
         await r.setex(songlink_cache_key(source_url), SONGLINK_CACHE_TTL, json.dumps(links))
     except Exception:  # noqa: BLE001 — кэш best-effort
         log.debug("Failed to cache songlink for %s", source_url)
+
+
+# ----- YouTube OAuth device-flow (ожидающие подтверждения) -----
+
+
+def _yt_oauth_pending_key(telegram_id: int) -> str:
+    return f"yt_oauth_pending:{telegram_id}"
+
+
+async def set_pending_youtube_oauth(telegram_id: int, payload: dict, ttl_s: int) -> None:
+    """Запомнить ожидающий device-flow (device_code, generation, ...)."""
+    r = await get_redis()
+    await r.setex(_yt_oauth_pending_key(telegram_id), ttl_s, json.dumps(payload))
+
+
+async def get_pending_youtube_oauth(telegram_id: int) -> dict | None:
+    """Прочитать ожидающий device-flow. None если нет/протух."""
+    r = await get_redis()
+    try:
+        data = await r.get(_yt_oauth_pending_key(telegram_id))
+    except Exception:  # noqa: BLE001 — best-effort
+        return None
+    if data is None:
+        return None
+    try:
+        parsed = json.loads(data)
+    except (ValueError, TypeError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+async def delete_pending_youtube_oauth(telegram_id: int) -> None:
+    r = await get_redis()
+    await r.delete(_yt_oauth_pending_key(telegram_id))

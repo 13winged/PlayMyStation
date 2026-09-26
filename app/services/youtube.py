@@ -24,8 +24,13 @@ import re
 import tempfile
 
 from app.core.retry import YOUTUBE_CIRCUIT
-from app.services.audio import MAX_TRACK_BYTES
+from app.services.audio import MAX_TRACK_BYTES, fetch_audio_bytes
 from app.services.base import BaseMusicService, TrackDTO
+from app.services.youtube_oauth import (
+    fetch_streaming_sync,
+    is_oauth_json,
+    server_oauth_credentials,
+)
 
 log = logging.getLogger("playmystation.youtube")
 
@@ -117,7 +122,13 @@ def _auth_dict(auth_json: str) -> dict:
 def _fetch_history_sync(auth_json: str) -> list:
     from ytmusicapi import YTMusic  # lazy import — тяжёлая зависимость
 
-    yt = YTMusic(auth=_auth_dict(auth_json))
+    if is_oauth_json(auth_json):
+        creds = server_oauth_credentials()
+        if creds is None:
+            raise ValueError("YouTube OAuth is not configured on the server")
+        yt = YTMusic(auth=json.loads(auth_json), oauth_credentials=creds)
+    else:
+        yt = YTMusic(auth=_auth_dict(auth_json))
     history = yt.get_history()
     return history if isinstance(history, list) else []
 
@@ -273,14 +284,31 @@ def pick_match(
     return None
 
 
+async def _download_via_streaming(auth_json: str, video_id: str) -> tuple[bytes, str] | None:
+    """Скачать аудио прямым потоком через OAuth-сессию юзера (без yt-dlp)."""
+    try:
+        picked = await asyncio.to_thread(fetch_streaming_sync, auth_json, video_id)
+    except Exception:  # noqa: BLE001 — best-effort докачка
+        await YOUTUBE_CIRCUIT.record_failure()
+        return None
+    if picked is None:
+        return None
+    url, ext = picked
+    data = await fetch_audio_bytes(url, max_bytes=MAX_TRACK_BYTES)
+    if not data:
+        return None
+    await YOUTUBE_CIRCUIT.record_success()
+    return data, ext
+
+
 async def download_by_query(
-    query: str, duration_ms: int | None = None, cookie_json: str | None = None
+    query: str, duration_ms: int | None = None, youtube_auth: str | None = None
 ) -> tuple[bytes, str] | None:
     """Найти трек на YouTube Music по 'Artist - Title' и скачать аудио.
 
     Схема как у Spotisaver: метаданные → поиск совпадения → скачивание.
-    Поиск не требует авторизации; скачивание — с куками юзера
-    (cookie_json — сохранённый auth-JSON), иначе бан по IP.
+    Поиск не требует авторизации. Скачивание: OAuth-поток по youtube_auth,
+    иначе yt-dlp с куками из него, иначе анонимно (возможен бан по IP).
     """
     try:
         candidates = await asyncio.to_thread(_search_candidates_sync, query)
@@ -290,7 +318,9 @@ async def download_by_query(
     video_id = pick_match(candidates, duration_ms)
     if not video_id:
         return None
-    cookie = extract_cookie(cookie_json) if cookie_json else None
+    if youtube_auth and is_oauth_json(youtube_auth):
+        return await _download_via_streaming(youtube_auth, video_id)
+    cookie = extract_cookie(youtube_auth) if youtube_auth else None
     try:
         async with asyncio.timeout(110):
             result = await asyncio.to_thread(_download_youtube_sync, video_id, cookie)
@@ -374,14 +404,18 @@ class YouTubeMusicService(BaseMusicService):
             track_id=video_id,
         )
 
-    async def download_track(self, track: TrackDTO) -> tuple[bytes, str] | None:
-        """Скачать полный трек через yt-dlp (родной m4a, без конвертации).
+    async def download_track(
+        self, track: TrackDTO, youtube_auth: str | None = None
+    ) -> tuple[bytes, str] | None:
+        """Скачать полный трек.
 
-        Качаем с куками из собственной привязки — иначе YouTube режет
-        серверные IP («Sign in to confirm you're not a bot»).
+        OAuth-привязка → прямой аудиопоток через сессию юзера (без yt-dlp).
+        Browser-привязка → yt-dlp с куками юзера (иначе бан серверного IP).
         """
         if not track.track_id:
             return None
+        if is_oauth_json(self._auth_json):
+            return await _download_via_streaming(self._auth_json, track.track_id)
         cookie = extract_cookie(self._auth_json)
         try:
             async with asyncio.timeout(110):

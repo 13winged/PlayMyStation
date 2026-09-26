@@ -85,14 +85,8 @@ STRINGS: dict[str, dict[str, str]] = {
         # Подключение YouTube Music
         "yt_connect": (
             "▶️ <b>Подключение YouTube Music</b>\n\n"
-            "1. Открой <code>music.youtube.com</code> в браузере и войди в аккаунт\n"
-            "2. Открой DevTools (Ctrl+Shift+I) → Network, в фильтр введи "
-            "<code>/browse</code>\n"
-            "3. Обнови страницу, найди POST-запрос <code>browse?...</code> и скопируй "
-            "заголовки ЦЕЛИКОМ (включая <code>authorization:</code>, "
-            "<code>cookie:</code> и <code>x-goog-authuser:</code>)\n"
-            "4. Пришли их боту командой:\n"
-            "<code>/youtube &lt;заголовки&gt;</code>"
+            "Пришли команду <code>/youtube</code> — предложу вход через Google "
+            "или заголовки из браузера."
         ),
         "yt_hint": (
             "▶️ <b>Подключение YouTube Music</b>\n\n"
@@ -129,6 +123,18 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "yt_ok": "✅ YouTube Music подключён! Жми /now 🎵",
         "yt_active": "▶️ Активный сервис: <b>YouTube Music</b>. Жми /now 🎵",
+        "yt_oauth_start": (
+            "▶️ <b>Вход через Google</b> (без DevTools):\n\n"
+            "1. Открой ссылку:\n{url}\n"
+            "2. Введи код:\n<code>{code}</code>\n"
+            "3. Подтверди доступ — я сам замечу (до {minutes} мин).\n\n"
+            "Альтернатива — заголовки из браузера: "
+            "<code>/youtube &lt;заголовки&gt;</code>."
+        ),
+        "yt_oauth_ok": "✅ YouTube Music подключён через Google! Жми /now 🎵",
+        "yt_oauth_denied": "❌ Доступ отклонён. Если передумаешь — пришли /youtube ещё раз.",
+        "yt_oauth_expired": "❌ Код протух (не уложились по времени). Пришли /youtube ещё раз.",
+        "yt_oauth_error": "❌ Не получилось завершить вход. Попробуй ещё раз или привяжи заголовками.",
         # Подключение Last.fm
         "lfm_connect": (
             "🟪 <b>Подключение Last.fm</b>\n\n"
@@ -274,14 +280,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "yx_active": "🔴 Active service: <b>Yandex Music</b>. Hit /now 🎵",
         "yt_connect": (
             "▶️ <b>Connecting YouTube Music</b>\n\n"
-            "1. Open <code>music.youtube.com</code> in your browser and sign in\n"
-            "2. Open DevTools (Ctrl+Shift+I) → Network, filter by "
-            "<code>/browse</code>\n"
-            "3. Reload the page, find the POST <code>browse?...</code> request and copy "
-            "the headers IN FULL (including <code>authorization:</code>, "
-            "<code>cookie:</code> and <code>x-goog-authuser:</code>)\n"
-            "4. Send them to the bot:\n"
-            "<code>/youtube &lt;headers&gt;</code>"
+            "Send the <code>/youtube</code> command — I'll offer Google sign-in "
+            "or browser headers."
         ),
         "yt_hint": (
             "▶️ <b>Connecting YouTube Music</b>\n\n"
@@ -318,6 +318,18 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "yt_ok": "✅ YouTube Music connected! Hit /now 🎵",
         "yt_active": "▶️ Active service: <b>YouTube Music</b>. Hit /now 🎵",
+        "yt_oauth_start": (
+            "▶️ <b>Sign in with Google</b> (no DevTools):\n\n"
+            "1. Open the link:\n{url}\n"
+            "2. Enter the code:\n<code>{code}</code>\n"
+            "3. Approve access — I'll notice it myself (up to {minutes} min).\n\n"
+            "Alternative — browser headers: "
+            "<code>/youtube &lt;headers&gt;</code>."
+        ),
+        "yt_oauth_ok": "✅ YouTube Music connected via Google! Hit /now 🎵",
+        "yt_oauth_denied": "❌ Access denied. If you change your mind — send /youtube again.",
+        "yt_oauth_expired": "❌ Code expired (ran out of time). Send /youtube again.",
+        "yt_oauth_error": "❌ Couldn't finish sign-in. Try again or link with headers.",
         "lfm_connect": (
             "🟪 <b>Connecting Last.fm</b>\n\n"
             "No OAuth needed — just send your username:\n"
