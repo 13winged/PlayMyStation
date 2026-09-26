@@ -19,9 +19,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
+import tempfile
 
 from app.core.retry import YOUTUBE_CIRCUIT
+from app.services.audio import MAX_TRACK_BYTES
 from app.services.base import BaseMusicService, TrackDTO
 
 log = logging.getLogger("playmystation.youtube")
@@ -98,6 +101,33 @@ async def check_auth(auth_json: str) -> bool:
     return True
 
 
+def _download_youtube_sync(video_id: str) -> tuple[bytes, str] | None:
+    """Скачать аудио через yt-dlp во временную директорию. Синхронная."""
+    from yt_dlp import YoutubeDL  # lazy import — тяжёлая зависимость
+
+    url = f"https://music.youtube.com/watch?v={video_id}"
+    with tempfile.TemporaryDirectory(prefix="pms-yt-") as workdir:
+        opts = {
+            "format": "bestaudio[ext=m4a]/bestaudio/best",
+            "outtmpl": os.path.join(workdir, "%(id)s.%(ext)s"),
+            "quiet": True,
+            "no_warnings": True,
+            "noplaylist": True,
+            "max_filesize": MAX_TRACK_BYTES,
+        }
+        with YoutubeDL(opts) as ydl:
+            ydl.download([url])
+        for name in os.listdir(workdir):
+            if name.startswith(video_id):
+                ext = name.rsplit(".", 1)[-1] if "." in name else "m4a"
+                with open(os.path.join(workdir, name), "rb") as f:
+                    data = f.read()
+                if not data or len(data) > MAX_TRACK_BYTES:
+                    return None
+                return data, ext
+    return None
+
+
 class YouTubeMusicService(BaseMusicService):
     provider = "youtube"
 
@@ -166,4 +196,20 @@ class YouTubeMusicService(BaseMusicService):
             track_url=track_url,
             provider="youtube",
             preview_url=None,  # легального превью у YT Music нет
+            track_id=video_id,
         )
+
+    async def download_track(self, track: TrackDTO) -> tuple[bytes, str] | None:
+        """Скачать полный трек через yt-dlp (родной m4a, без конвертации)."""
+        if not track.track_id:
+            return None
+        try:
+            async with asyncio.timeout(110):
+                data_ext = await asyncio.to_thread(_download_youtube_sync, track.track_id)
+        except (TimeoutError, Exception):  # noqa: BLE001 — best-effort докачка
+            await YOUTUBE_CIRCUIT.record_failure()
+            return None
+        if data_ext is None:
+            return None
+        await YOUTUBE_CIRCUIT.record_success()
+        return data_ext

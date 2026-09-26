@@ -1,6 +1,14 @@
-"""Команда /now и /np: опрос активного сервиса или всех (режим ALL)."""
+"""Команда /now и /np: опрос активного сервиса или всех (режим ALL).
+
+После карточки трека бот фоном докачивает аудио и присылает его
+следующим сообщением (best-effort): Яндекс/YouTube — полный трек,
+Spotify — 30-сек превью, Last.fm — нечего качать.
+"""
 
 from __future__ import annotations
+
+import asyncio
+import logging
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -9,13 +17,54 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.formatters import track_card
 from app.bot.keyboards import now_empty_kb, track_kb
+from app.core.db import SessionFactory
 from app.db import repositories as repo
 from app.db.models import User
 from app.services.audio import fetch_audio_bytes, safe_filename
 from app.services.base import TrackDTO
-from app.services.factory import resolve_now_playing
+from app.services.factory import build_service, resolve_now_playing
 
 router = Router()
+
+log = logging.getLogger("playmystation.now")
+
+# Докачка идёт вне bulkhead-таймаута /now: YT-трек может качаться минуту+.
+DOWNLOAD_TIMEOUT = 120.0
+
+
+async def _send_track_audio(message: Message, db_user: User, track: TrackDTO) -> None:
+    """Фоновая докачка аудио после /now. Best-effort: тихо, без спама в чат."""
+    if track.provider not in ("yandex", "youtube", "spotify"):
+        return
+    try:
+        async with SessionFactory() as session:
+            integrations = await repo.list_integrations(session, db_user.id)
+            integ = next((i for i in integrations if i.provider == track.provider), None)
+            if integ is None:
+                return
+            svc = await build_service(integ, session)
+            if svc is None:
+                return
+            try:
+                result = await asyncio.wait_for(
+                    svc.download_track(track), timeout=DOWNLOAD_TIMEOUT
+                )
+            except (TimeoutError, Exception):  # noqa: BLE001 — докачка не обязана успевать
+                log.info("download failed/timeout: %s '%s'", track.provider, track.title)
+                return
+            if result is None:
+                return
+            data, ext = result
+            audio = BufferedInputFile(
+                data, filename=safe_filename(track.artist, track.title, ext=ext)
+            )
+            await message.answer_audio(audio, title=track.title, performer=track.artist)
+    except Exception:
+        log.exception("download task crashed")
+
+
+def _schedule_download(message: Message, db_user: User, track: TrackDTO) -> None:
+    asyncio.create_task(_send_track_audio(message, db_user, track))
 
 
 async def _answer_now(message: Message, session: AsyncSession, db_user: User) -> None:
@@ -43,6 +92,7 @@ async def _answer_now(message: Message, session: AsyncSession, db_user: User) ->
         )
     else:
         await message.answer(track_card(track), reply_markup=kb)
+    _schedule_download(message, db_user, track)
 
 
 @router.message(Command("now", "np"))
@@ -71,6 +121,7 @@ async def cb_now(cb: CallbackQuery, session: AsyncSession, db_user: User) -> Non
         )
     else:
         await cb.message.answer(track_card(track), reply_markup=kb)
+    _schedule_download(cb.message, db_user, track)
 
 
 @router.callback_query(F.data == "dl:preview")

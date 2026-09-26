@@ -16,6 +16,8 @@ log = logging.getLogger("playmystation.audio")
 
 # Превью Spotify ~300–500 КБ; кап с запасом, чтобы не тащить мусор в память.
 MAX_AUDIO_BYTES = 8 * 1024 * 1024
+# Полные треки (Яндекс/YouTube): лимит Bot API — 50 МБ, берём с запасом ниже.
+MAX_TRACK_BYTES = 45 * 1024 * 1024
 DOWNLOAD_TIMEOUT = 20.0
 
 
@@ -29,7 +31,7 @@ def safe_filename(artist: str, title: str, ext: str = "mp3") -> str:
     return f"{base or 'track'}.{ext}"
 
 
-async def fetch_audio_bytes(url: str) -> bytes | None:
+async def fetch_audio_bytes(url: str, max_bytes: int = MAX_AUDIO_BYTES) -> bytes | None:
     """Скачать аудио по прямой ссылке. Вернёт None при любой проблеме."""
     try:
         async with (
@@ -41,7 +43,7 @@ async def fetch_audio_bytes(url: str) -> bytes | None:
             length = resp.headers.get("Content-Length")
             if length is not None:
                 try:
-                    if int(length) > MAX_AUDIO_BYTES:
+                    if int(length) > max_bytes:
                         log.warning("Audio too large (%s bytes), skip %s", length, url)
                         return None
                 except ValueError:
@@ -50,7 +52,7 @@ async def fetch_audio_bytes(url: str) -> bytes | None:
             total = 0
             async for chunk in resp.aiter_bytes(64 * 1024):
                 total += len(chunk)
-                if total > MAX_AUDIO_BYTES:
+                if total > max_bytes:
                     log.warning("Audio exceeded cap while streaming, skip %s", url)
                     return None
                 chunks.append(chunk)

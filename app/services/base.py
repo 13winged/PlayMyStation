@@ -20,6 +20,9 @@ class TrackDTO:
     # Прямая ссылка на воспроизводимое аудио, если сервис её отдаёт:
     # Spotify — 30-секундное preview_url. У Яндекса/YouTube/Last.fm — всегда None.
     preview_url: str | None = None
+    # Нативный ID трека в сервисе (YouTube videoId, Яндекс track id).
+    # Нужен для докачки полного аудио через download_track().
+    track_id: str | None = None
 
 
 class BaseMusicService(ABC):
@@ -30,3 +33,12 @@ class BaseMusicService(ABC):
     @abstractmethod
     async def get_currently_playing(self) -> TrackDTO | None:
         raise NotImplementedError
+
+    async def download_track(self, track: TrackDTO) -> tuple[bytes, str] | None:
+        """Скачать полное аудио трека. Возвращает (байты, расширение) или None.
+
+        Дефолт — не поддерживается (Last.fm). Переопределяют сервисы,
+        у которых есть доступ к аудио: Яндекс (прямые ссылки),
+        YouTube (yt-dlp), Spotify (только 30-сек preview_url).
+        """
+        return None

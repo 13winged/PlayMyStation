@@ -12,6 +12,7 @@ import httpx
 
 from app.core.config import get_settings
 from app.core.retry import SPOTIFY_CIRCUIT, create_retry_transport
+from app.services.audio import fetch_audio_bytes
 from app.services.base import BaseMusicService, TrackDTO
 
 log = logging.getLogger("playmystation.spotify")
@@ -242,3 +243,12 @@ class SpotifyService(BaseMusicService):
             provider="spotify",
             preview_url=item.get("preview_url"),
         )
+
+    async def download_track(self, track: TrackDTO) -> tuple[bytes, str] | None:
+        """У Spotify нет API полного аудио — отдаём 30-сек preview, если есть."""
+        if not track.preview_url:
+            return None
+        data = await fetch_audio_bytes(track.preview_url)
+        if not data:
+            return None
+        return data, "mp3"

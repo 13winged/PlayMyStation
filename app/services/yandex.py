@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
 from app.core.retry import YANDEX_CIRCUIT
+from app.services.audio import MAX_TRACK_BYTES, fetch_audio_bytes
 from app.services.base import BaseMusicService, TrackDTO
 from app.services.ynison import Ynison, YnisonError
 
@@ -47,6 +49,7 @@ class YandexMusicService(BaseMusicService):
             cover_url=cover,
             track_url=track_url,
             provider="yandex",
+            track_id=str(full.id),
         )
 
     def _fetch_track_sync(self, track_id: str) -> TrackDTO | None:
@@ -97,6 +100,9 @@ class YandexMusicService(BaseMusicService):
         if snapshot.duration_ms:
             track.duration_ms = snapshot.duration_ms
         track.is_playing = not snapshot.paused
+        # playable_id — тот ID, которым трек реально резолвится в API,
+        # его же используем для докачки аудио.
+        track.track_id = current.playable_id
         return track
 
     async def get_currently_playing(self) -> TrackDTO | None:
@@ -113,3 +119,44 @@ class YandexMusicService(BaseMusicService):
         if track is not None:
             await YANDEX_CIRCUIT.record_success()
         return track
+
+    async def download_track(self, track: TrackDTO) -> tuple[bytes, str] | None:
+        """Скачать полный трек через прямые ссылки (токен юзера, его подписка)."""
+        if not track.track_id:
+            return None
+        try:
+            link, ext = await asyncio.to_thread(
+                self._direct_link_sync, track.track_id
+            )
+        except Exception:  # noqa: BLE001 — API Яндекса нестабилен
+            await YANDEX_CIRCUIT.record_failure()
+            return None
+        if not link:
+            return None
+        data = await fetch_audio_bytes(link, max_bytes=MAX_TRACK_BYTES)
+        if not data:
+            return None
+        return data, ext
+
+    def _direct_link_sync(self, track_id: str) -> tuple[str | None, str]:
+        from yandex_music import Client  # lazy import — тяжёлая зависимость
+
+        client = Client(self._token).init()
+        tracks = client.tracks([track_id])
+        if not tracks:
+            return None, "mp3"
+        best = pick_best_download_info(tracks[0].get_download_info())
+        if best is None:
+            return None, "mp3"
+        codec = str(getattr(best, "codec", "mp3") or "mp3").lower()
+        return best.get_direct_link(), codec if codec in ("mp3", "aac") else "mp3"
+
+
+def pick_best_download_info(infos: list[Any]) -> Any | None:
+    """Выбрать максимальное качество: сначала mp3, иначе любой кодек."""
+    pool = list(infos or [])
+    if not pool:
+        return None
+    mp3 = [i for i in pool if getattr(i, "codec", "") == "mp3"]
+    candidates = mp3 or pool
+    return max(candidates, key=lambda i: getattr(i, "bitrate_in_kbps", 0) or 0)
