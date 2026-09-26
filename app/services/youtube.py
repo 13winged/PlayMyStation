@@ -31,6 +31,32 @@ log = logging.getLogger("playmystation.youtube")
 
 REQUIRED_HEADER_KEYS = frozenset({"authorization", "cookie", "x-goog-authuser"})
 
+# Строка вида "Header-Name:" (двоеточие, пустое значение) — Firefox/Chrome
+# при копировании иногда кладут значение на следующую строку. Склеиваем.
+_SPLIT_HEADER_RE = re.compile(r"^[A-Za-z0-9-]+:$")
+
+
+def normalize_headers_raw(headers_raw: str) -> str:
+    """Склеить заголовки, чьё значение перенесено на следующую строку.
+
+    Чистая функция: "authorization:" + "SAPISIDHASH ..." →
+    "authorization: SAPISIDHASH ...". Строки вида "Name: value" не трогаем.
+    """
+    merged: list[str] = []
+    for line in headers_raw.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if (
+            merged
+            and _SPLIT_HEADER_RE.fullmatch(merged[-1].strip())
+            and ": " not in stripped
+        ):
+            merged[-1] = merged[-1].rstrip() + " " + stripped
+        else:
+            merged.append(line)
+    return "\n".join(merged)
+
 # В истории YT для видео вторым «артистом» часто прилетает счётчик
 # просмотров ("29M views", "1,1 млн просмотров") — вычищаем.
 _VIEWS_RE = re.compile(r"view|просмотр|stream|listen", re.IGNORECASE)
@@ -54,6 +80,11 @@ def validate_auth_json(auth_json: str) -> None:
     missing = sorted(REQUIRED_HEADER_KEYS - set(lowered))
     if missing:
         raise ValueError(f"missing headers: {', '.join(missing)}")
+    authorization = str(lowered.get("authorization") or "")
+    if "SAPISIDHASH" not in authorization:
+        # Зеркалим детект BROWSER в ytmusicapi: без SAPISIDHASH нас
+        # классифицируют как OAuth и упадут с YTMusicUserError.
+        raise ValueError("bad authorization: no SAPISIDHASH (copy the full line)")
     cookie = str(lowered.get("cookie") or "")
     if "__Secure-3PAPISID" not in cookie:
         raise ValueError("not logged in: no __Secure-3PAPISID in cookie")
@@ -69,7 +100,7 @@ def build_auth_json(headers_raw: str) -> str:
     from ytmusicapi import setup  # lazy import — тяжёлая зависимость
 
     try:
-        auth_json = setup(headers_raw=headers_raw)
+        auth_json = setup(headers_raw=normalize_headers_raw(headers_raw))
     except Exception as e:
         raise ValueError(f"bad headers: {e}") from e
     validate_auth_json(auth_json)
@@ -96,7 +127,12 @@ async def check_auth(auth_json: str) -> bool:
     try:
         await asyncio.to_thread(_fetch_history_sync, auth_json)
     except Exception:
-        log.warning("YouTube auth check failed", exc_info=True)
+        # Логируем только ИМЕНА ключей (без значений — там секреты).
+        try:
+            keys = sorted(str(k) for k in json.loads(auth_json))
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            keys = []
+        log.warning("YouTube auth check failed (keys=%s)", keys, exc_info=True)
         return False
     return True
 

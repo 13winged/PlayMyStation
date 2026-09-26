@@ -7,6 +7,7 @@ import pytest
 from app.services.youtube import (
     cookie_header_to_netscape,
     extract_cookie,
+    normalize_headers_raw,
     validate_auth_json,
 )
 
@@ -43,6 +44,26 @@ def test_validate_auth_json_not_json() -> None:
         validate_auth_json("cookie: blah")
     with pytest.raises(TypeError, match="not JSON"):
         validate_auth_json("[1, 2]")
+
+
+def test_normalize_headers_raw_joins_split_value() -> None:
+    raw = "authorization: \nSAPISIDHASH abc_u\ncookie: SID=x\nx-goog-authuser: 0"
+    out = normalize_headers_raw(raw)
+    assert "authorization: SAPISIDHASH abc_u" in out.splitlines()
+
+
+def test_normalize_headers_raw_keeps_single_lines() -> None:
+    raw = "authorization: SAPISIDHASH abc_u\ncookie: SID=x"
+    assert normalize_headers_raw(raw) == raw
+
+
+def test_normalize_headers_raw_skips_blanks() -> None:
+    assert normalize_headers_raw("\ncookie: SID=x\n\n") == "cookie: SID=x"
+
+
+def test_validate_auth_json_rejects_authorization_without_sapishash() -> None:
+    with pytest.raises(ValueError, match="SAPISIDHASH"):
+        validate_auth_json(_auth_json(authorization="Bearer xyz"))
 
 
 def test_extract_cookie() -> None:
