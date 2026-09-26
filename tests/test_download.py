@@ -7,7 +7,11 @@ import pytest
 from app.services.audio import audio_cache_key
 from app.services.base import BaseMusicService, TrackDTO
 from app.services.spotify import SpotifyService
-from app.services.yandex import YandexMusicService, pick_best_download_info
+from app.services.yandex import (
+    YandexMusicService,
+    candidate_track_ids,
+    pick_best_download_info,
+)
 from app.services.youtube import YouTubeMusicService, parse_duration_seconds, pick_match
 
 
@@ -67,6 +71,10 @@ class TestPickBestDownloadInfo:
 
     def test_empty_returns_none(self) -> None:
         assert pick_best_download_info([]) is None
+
+    def test_candidate_ids(self) -> None:
+        assert candidate_track_ids("39072660") == ["39072660"]
+        assert candidate_track_ids("39072660:5027546") == ["39072660:5027546", "39072660"]
 
 
 class TestSpotifyDownload:

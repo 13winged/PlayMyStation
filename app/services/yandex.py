@@ -123,18 +123,24 @@ class YandexMusicService(BaseMusicService):
     async def download_track(self, track: TrackDTO) -> tuple[bytes, str] | None:
         """Скачать полный трек через прямые ссылки (токен юзера, его подписка)."""
         if not track.track_id:
+            log.info("yandex download: no track_id for '%s'", track.title)
             return None
         try:
             link, ext = await asyncio.to_thread(
                 self._direct_link_sync, track.track_id
             )
-        except Exception:  # noqa: BLE001 — API Яндекса нестабилен
+        except Exception:
+            log.warning(
+                "yandex download: direct link failed for id=%s", track.track_id, exc_info=True
+            )
             await YANDEX_CIRCUIT.record_failure()
             return None
         if not link:
+            log.info("yandex download: no download info for id=%s", track.track_id)
             return None
         data = await fetch_audio_bytes(link, max_bytes=MAX_TRACK_BYTES)
         if not data:
+            log.info("yandex download: fetch failed for id=%s", track.track_id)
             return None
         return data, ext
 
@@ -142,14 +148,26 @@ class YandexMusicService(BaseMusicService):
         from yandex_music import Client  # lazy import — тяжёлая зависимость
 
         client = Client(self._token).init()
-        tracks = client.tracks([track_id])
-        if not tracks:
-            return None, "mp3"
-        best = pick_best_download_info(tracks[0].get_download_info())
-        if best is None:
-            return None, "mp3"
-        codec = str(getattr(best, "codec", "mp3") or "mp3").lower()
-        return best.get_direct_link(), codec if codec in ("mp3", "aac") else "mp3"
+        for candidate in candidate_track_ids(track_id):
+            tracks = client.tracks([candidate])
+            if not tracks:
+                continue
+            best = pick_best_download_info(tracks[0].get_download_info())
+            if best is None:
+                continue
+            codec = str(getattr(best, "codec", "mp3") or "mp3").lower()
+            return best.get_direct_link(), codec if codec in ("mp3", "aac") else "mp3"
+        return None, "mp3"
+
+
+def candidate_track_ids(track_id: str) -> list[str]:
+    """ID для перебора: как есть + голый ID без суффикса альбома.
+
+    Ynison отдаёт playable_id вида '39072660:5027546', metadata-API его ест,
+    а download-info иногда хочет голый ID — пробуем оба.
+    """
+    bare = track_id.split(":")[0]
+    return [track_id] if bare == track_id else [track_id, bare]
 
 
 def pick_best_download_info(infos: list[Any]) -> Any | None:
