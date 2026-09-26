@@ -165,8 +165,8 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "preview_failed": "❌ Не получилось скачать превью. Попробуй позже.",
         # /lang
-        "lang_current": "🌐 Текущий язык: <b>{lang}</b>. Выбери новый:",
-        "lang_set": "✅ Язык: <b>{lang}</b>.",
+        "lang_current": "🌐 Текущий язык: <b>{language}</b>. Выбери новый:",
+        "lang_set": "✅ Язык: <b>{language}</b>.",
         "lang_name_ru": "Русский",
         "lang_name_en": "English",
         # Карточка трека
@@ -335,8 +335,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "Spotify doesn't provide previews for every track."
         ),
         "preview_failed": "❌ Couldn't download the preview. Try later.",
-        "lang_current": "🌐 Current language: <b>{lang}</b>. Pick a new one:",
-        "lang_set": "✅ Language: <b>{lang}</b>.",
+        "lang_current": "🌐 Current language: <b>{language}</b>. Pick a new one:",
+        "lang_set": "✅ Language: <b>{language}</b>.",
         "lang_name_ru": "Русский",
         "lang_name_en": "English",
         "card_playing": "▶️ Now playing",

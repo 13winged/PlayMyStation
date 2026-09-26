@@ -33,6 +33,15 @@ def test_t_formats_and_falls_back() -> None:
     assert t("xx", "sp_ok") == t("ru", "sp_ok")  # неизвестный язык → RU
 
 
+def test_all_keys_render_without_type_errors() -> None:
+    """Каждый ключ рендерится с dummy-плейсхолдерами (ловит коллизии имён)."""
+    for lang in ("ru", "en"):
+        for key, template in STRINGS[lang].items():
+            kwargs = {ph: "X" for ph in _placeholders(template)}
+            rendered = t(lang, key, **kwargs)
+            assert isinstance(rendered, str) and rendered
+
+
 def test_lang_of() -> None:
     assert lang_of(SimpleNamespace(language="en")) == "en"
     assert lang_of(SimpleNamespace(language="ru")) == "ru"

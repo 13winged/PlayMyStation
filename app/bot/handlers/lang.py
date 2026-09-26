@@ -29,7 +29,7 @@ def lang_kb() -> InlineKeyboardMarkup:
 async def cmd_lang(message: Message, session: AsyncSession, db_user: User) -> None:
     lang = lang_of(db_user)
     current = t(lang, "lang_name_ru") if lang == "ru" else t(lang, "lang_name_en")
-    await message.answer(t(lang, "lang_current", lang=current), reply_markup=lang_kb())
+    await message.answer(t(lang, "lang_current", language=current), reply_markup=lang_kb())
 
 
 @router.callback_query(F.data.startswith("lang:"))
@@ -41,5 +41,5 @@ async def cb_lang(cb: CallbackQuery, session: AsyncSession, db_user: User) -> No
     await repo.set_language(session, db_user, new_lang)
     await session.commit()
     # Отвечаем уже на новом языке, клавиатуру убираем.
-    await cb.message.edit_text(t(new_lang, "lang_set", lang=new_lang.upper()))
+    await cb.message.edit_text(t(new_lang, "lang_set", language=new_lang.upper()))
     await cb.answer()
