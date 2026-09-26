@@ -29,6 +29,10 @@ class BaseMusicService(ABC):
     """Базовый класс стратегии. Каждый сервис обязан вернуть текущий трек или None."""
 
     provider: str = "base"
+    # Флаги возможностей (эволюция под управление воспроизведением):
+    # управление показывают кнопками только сервисы с supports_control/like.
+    supports_control: bool = False  # play/pause/next/previous
+    supports_like: bool = False  # добавить текущий трек в любимое
 
     @abstractmethod
     async def get_currently_playing(self) -> TrackDTO | None:
@@ -46,3 +50,18 @@ class BaseMusicService(ABC):
         качает через него, иначе YouTube банит серверный IP.
         """
         return None
+
+    async def set_playing(self, playing: bool) -> str:
+        """Продолжить (True) или поставить на паузу (False).
+
+        Возвращает: ok | premium | no_device | unsupported | error.
+        """
+        return "unsupported"
+
+    async def skip(self, direction: str = "next") -> str:
+        """Следующий (next) или предыдущий (previous) трек. Тот же статус."""
+        return "unsupported"
+
+    async def like_track(self, track: TrackDTO) -> str:
+        """Добавить трек в любимое. Тот же статус."""
+        return "unsupported"

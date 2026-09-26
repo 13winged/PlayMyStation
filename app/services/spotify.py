@@ -56,7 +56,8 @@ async def close_spotify_client() -> None:
 def build_authorize_url(
     state: str,
     scopes: str = (
-        "user-read-currently-playing user-read-playback-state user-read-recently-played"
+        "user-read-currently-playing user-read-playback-state user-read-recently-played "
+        "user-modify-playback-state user-library-modify"
     ),
 ) -> str:
     s = get_settings()
@@ -74,6 +75,8 @@ def build_authorize_url(
 
 class SpotifyService(BaseMusicService):
     provider = "spotify"
+    supports_control = True
+    supports_like = True
 
     def __init__(
         self,
@@ -197,6 +200,7 @@ class SpotifyService(BaseMusicService):
             track_url=(item.get("external_urls") or {}).get("spotify"),
             provider="spotify",
             preview_url=item.get("preview_url"),  # 30-секундное превью (может быть None)
+            track_id=item.get("id"),  # Spotify ID — нужен для like
         )
 
     async def _get_recently_played(self) -> TrackDTO | None:
@@ -243,6 +247,7 @@ class SpotifyService(BaseMusicService):
             track_url=(item.get("external_urls") or {}).get("spotify"),
             provider="spotify",
             preview_url=item.get("preview_url"),
+            track_id=item.get("id"),
         )
 
     async def download_track(
@@ -267,3 +272,48 @@ class SpotifyService(BaseMusicService):
         if not data:
             return None
         return data, "mp3"
+
+    # ---------- Управление воспроизведением ----------
+
+    async def _control(self, method: str, url: str, _retried: bool = False, **kwargs) -> str:
+        """Вызвать player/library API. Возвращает ok|premium|no_device|error."""
+        client = await _get_spotify_client()
+
+        async def _do_request() -> httpx.Response:
+            call = getattr(client, method)
+            return await call(
+                url,
+                headers={"Authorization": f"Bearer {self._access_token}"},
+                **kwargs,
+            )
+
+        try:
+            resp = await SPOTIFY_CIRCUIT.call(_do_request)
+        except (httpx.HTTPError, TimeoutError):
+            return "error"
+        if resp.status_code in (200, 204):
+            return "ok"
+        if resp.status_code == 401 and self._refresh_token and not _retried:
+            if await self._refresh():
+                return await self._control(method, url, _retried=True, **kwargs)
+            return "error"
+        if resp.status_code == 403:
+            return "premium"  # нет Premium / скоупов / restrictions
+        if resp.status_code == 404:
+            return "no_device"  # нет активного устройства
+        return "error"
+
+    async def set_playing(self, playing: bool) -> str:
+        action = "play" if playing else "pause"
+        return await self._control("put", f"https://api.spotify.com/v1/me/player/{action}")
+
+    async def skip(self, direction: str = "next") -> str:
+        action = "previous" if direction == "previous" else "next"
+        return await self._control("post", f"https://api.spotify.com/v1/me/player/{action}")
+
+    async def like_track(self, track: TrackDTO) -> str:
+        if not track.track_id:
+            return "error"
+        return await self._control(
+            "put", "https://api.spotify.com/v1/me/tracks", params={"ids": track.track_id}
+        )

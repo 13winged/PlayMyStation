@@ -18,7 +18,7 @@
 - [x] Тесты: `track_card` (в т.ч. экранирование HTML), `factory` (моки + таймауты), репозитории (sqlite+aiosqlite), Spotify-фолбэк, Last.fm, Ynison, парсинг `/spotify`/`/yandex` — 59 passed
 
 ## Milestone 2 — UX
-- [ ] Кнопки ⏯ ⏭ ⏮ (Spotify API control) + автообновление карточки /now каждые N сек
+- [x] Кнопки управления — ⏸/▶️/⏭/⏮/❤️ под карточкой `/now` для Spotify (статусы ok|premium|no_device|error, кеш инвалидируется)
 - [x] Обложка трека + ссылка-кнопка в карточке
 - [ ] История «последние 10 треков» (Redis list на юзера)
 - [ ] Уведомления «друг слушает»: подписки на друзей, дайджест
@@ -26,7 +26,7 @@
 
 ## Milestone 4 — По мотивам es3n1n/nowplaying (свой код, не форк)
 - [x] **Last.fm-провайдер** (`user.getrecenttracks`, только username + API key) — рабочий `/now` для free-юзеров без Premium где бы то ни было
-- [ ] **Флаги возможностей платформы** (`PLAY/LIKE/QUEUE`) — эволюция `BaseMusicService` под управление воспроизведением
+- [x] **Флаги возможностей платформы** — `supports_control/supports_like` в `BaseMusicService` (Spotify: True/True, остальные False)
 - [x] **Ynison-realtime для Яндекса** — спортирован gRPC-клиент нативного протокола + Go-сайдкар `ynison` в compose (realtime-трек + прогресс, фолбэк на эвристику очереди). Проверено на проде 2026-09-26: карточка с прогресс-баром `0:55 / 2:38`
 - [x] **Докачка аудио в /now** (решение владельца 2026-09-26, риски ToS приняты): Яндекс — полный трек по токену, YouTube — `yt-dlp` m4a, Spotify — 30-сек preview, Last.fm — ничего; кап 45 МБ, фоном best-effort
 - [x] **Кеш аудио через Telegram-канал** — скачанное складывается в приватный канал (`AUDIO_CACHE_CHANNEL_ID`), повторная отдача по `file_id` из Redis (TTL 30 дней)

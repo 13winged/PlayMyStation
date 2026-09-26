@@ -186,6 +186,22 @@ STRINGS: dict[str, dict[str, str]] = {
         "btn_preview": "⏬ Превью (30 сек)",
         "btn_connect": "🔗 Подключить",
         "btn_back": "◀️ Назад к сервисам",
+        # Кнопки управления Spotify
+        "btn_pause": "⏸ Пауза",
+        "btn_play": "▶️ Играть",
+        "btn_next": "⏭ Дальше",
+        "btn_prev": "⏮ Назад",
+        "btn_like": "❤️ В любимые",
+        "ctl_paused": "⏸ Пауза",
+        "ctl_resumed": "▶️ Играет",
+        "ctl_skipped_next": "⏭ Следующий трек",
+        "ctl_skipped_prev": "⏮ Предыдущий трек",
+        "ctl_liked": "❤️ В любимых",
+        "ctl_failed": (
+            "❌ Не вышло: нужны Spotify Premium, активное устройство "
+            "и свежая привязка (переподключи Spotify в /services)."
+        ),
+        "ctl_no_spotify": "❌ Spotify не подключён. Открой /services.",
     },
     "en": {
         "start_text": (
@@ -354,6 +370,21 @@ STRINGS: dict[str, dict[str, str]] = {
         "btn_preview": "⏬ Preview (30 sec)",
         "btn_connect": "🔗 Connect",
         "btn_back": "◀️ Back to services",
+        "btn_pause": "⏸ Pause",
+        "btn_play": "▶️ Play",
+        "btn_next": "⏭ Next",
+        "btn_prev": "⏮ Previous",
+        "btn_like": "❤️ Like",
+        "ctl_paused": "⏸ Paused",
+        "ctl_resumed": "▶️ Playing",
+        "ctl_skipped_next": "⏭ Next track",
+        "ctl_skipped_prev": "⏮ Previous track",
+        "ctl_liked": "❤️ Liked",
+        "ctl_failed": (
+            "❌ Failed: Spotify Premium, an active device "
+            "and a fresh link are required (reconnect Spotify in /services)."
+        ),
+        "ctl_no_spotify": "❌ Spotify is not connected. Open /services.",
     },
 }
 

@@ -75,13 +75,25 @@ def track_kb(
     has_preview: bool,
     platform_links: dict[str, str] | None = None,
     lang: str = "ru",
+    controls: bool = False,
+    playing: bool = False,
 ) -> InlineKeyboardMarkup:
-    """Клавиатура под карточкой трека: превью + другие платформы + сервисы."""
+    """Клавиатура под карточкой: превью + управление + платформы + сервисы."""
     meta = _meta(lang)
     rows: list[list[InlineKeyboardButton]] = []
     if has_preview:
         rows.append(
             [InlineKeyboardButton(text=t(lang, "btn_preview"), callback_data="dl:preview")]
+        )
+    if controls:
+        toggle = t(lang, "btn_pause") if playing else t(lang, "btn_play")
+        rows.append(
+            [
+                InlineKeyboardButton(text=toggle, callback_data="ctl:toggle"),
+                InlineKeyboardButton(text=t(lang, "btn_prev"), callback_data="ctl:prev"),
+                InlineKeyboardButton(text=t(lang, "btn_next"), callback_data="ctl:next"),
+                InlineKeyboardButton(text=t(lang, "btn_like"), callback_data="ctl:like"),
+            ]
         )
     if platform_links:
         buttons = [

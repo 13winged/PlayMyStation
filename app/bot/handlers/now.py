@@ -21,13 +21,19 @@ from app.bot.i18n import lang_of, t
 from app.bot.keyboards import now_empty_kb, track_kb
 from app.core.config import get_settings
 from app.core.db import SessionFactory
-from app.core.redis import get_cached_audio_file_id, set_cached_audio_file_id
+from app.core.redis import (
+    get_cached_audio_file_id,
+    get_cached_now_playing,
+    invalidate_now_playing_cache,
+    set_cached_audio_file_id,
+)
 from app.db import repositories as repo
 from app.db.models import User
 from app.services.audio import audio_cache_key, fetch_audio_bytes, safe_filename
 from app.services.base import TrackDTO
-from app.services.factory import build_service, resolve_now_playing
+from app.services.factory import _safe_get_playing, build_service, resolve_now_playing
 from app.services.songlink import match_platform_links
+from app.services.spotify import SpotifyService
 
 router = Router()
 
@@ -137,7 +143,13 @@ async def _add_platform_buttons(sent: Message, track: TrackDTO, lang: str) -> No
         return
     try:
         await sent.edit_reply_markup(
-            reply_markup=track_kb(bool(track.preview_url), links, lang)
+            reply_markup=track_kb(
+                bool(track.preview_url),
+                links,
+                lang,
+                controls=(track.provider == "spotify"),
+                playing=track.is_playing,
+            )
         )
     except TelegramAPIError:
         log.info("songlink buttons edit failed (message gone?)")
@@ -161,7 +173,12 @@ async def _answer_now(message: Message, session: AsyncSession, db_user: User) ->
             reply_markup=now_empty_kb(lang),
         )
         return
-    kb = track_kb(has_preview=bool(track.preview_url), lang=lang)
+    kb = track_kb(
+        has_preview=bool(track.preview_url),
+        lang=lang,
+        controls=(track.provider == "spotify"),
+        playing=track.is_playing,
+    )
     if track.cover_url:
         sent = await message.answer_photo(
             photo=track.cover_url, caption=track_card(track, lang), reply_markup=kb
@@ -192,7 +209,12 @@ async def cb_now(cb: CallbackQuery, session: AsyncSession, db_user: User) -> Non
     if track is None:
         await cb.message.answer(t(lang, "now_nothing_short"))
         return
-    kb = track_kb(has_preview=bool(track.preview_url), lang=lang)
+    kb = track_kb(
+        has_preview=bool(track.preview_url),
+        lang=lang,
+        controls=(track.provider == "spotify"),
+        playing=track.is_playing,
+    )
     if track.cover_url:
         sent = await cb.message.answer_photo(
             photo=track.cover_url, caption=track_card(track, lang), reply_markup=kb
@@ -229,3 +251,72 @@ async def cb_preview(cb: CallbackQuery, session: AsyncSession, db_user: User) ->
         return
     audio = BufferedInputFile(data, filename=safe_filename(track.artist, track.title))
     await cb.message.answer_audio(audio, title=track.title, performer=track.artist)
+
+
+# ---------- Управление воспроизведением Spotify ----------
+
+
+async def _spotify_ctx(
+    session: AsyncSession, db_user: User
+) -> tuple[SpotifyService | None, TrackDTO | None]:
+    """Spotify-сервис юзера + текущий трек (сначала Redis, иначе опрос)."""
+    integrations = await repo.list_integrations(session, db_user.id)
+    integ = next((i for i in integrations if i.provider == "spotify"), None)
+    if integ is None:
+        return None, None
+    svc = await build_service(integ, session)
+    if not isinstance(svc, SpotifyService):
+        return None, None
+    track = await get_cached_now_playing(db_user.telegram_id)
+    if track is None or track.provider != "spotify":
+        track = await _safe_get_playing(svc)
+    return svc, track
+
+
+async def _answer_control(
+    cb: CallbackQuery, db_user: User, status: str, ok_key: str
+) -> None:
+    lang = lang_of(db_user)
+    if status == "ok":
+        await invalidate_now_playing_cache(db_user.telegram_id)
+        await cb.answer(t(lang, ok_key))
+    else:
+        await cb.answer(t(lang, "ctl_failed"), show_alert=True)
+
+
+@router.callback_query(F.data == "ctl:toggle")
+async def cb_control_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> None:
+    svc, track = await _spotify_ctx(session, db_user)
+    if svc is None:
+        await cb.answer(t(lang_of(db_user), "ctl_no_spotify"), show_alert=True)
+        return
+    playing = bool(track and track.is_playing)
+    status = await svc.set_playing(not playing)
+    await _answer_control(cb, db_user, status, "ctl_resumed" if not playing else "ctl_paused")
+
+
+@router.callback_query(F.data == "ctl:next")
+async def cb_control_next(cb: CallbackQuery, session: AsyncSession, db_user: User) -> None:
+    svc, _ = await _spotify_ctx(session, db_user)
+    if svc is None:
+        await cb.answer(t(lang_of(db_user), "ctl_no_spotify"), show_alert=True)
+        return
+    await _answer_control(cb, db_user, await svc.skip("next"), "ctl_skipped_next")
+
+
+@router.callback_query(F.data == "ctl:prev")
+async def cb_control_prev(cb: CallbackQuery, session: AsyncSession, db_user: User) -> None:
+    svc, _ = await _spotify_ctx(session, db_user)
+    if svc is None:
+        await cb.answer(t(lang_of(db_user), "ctl_no_spotify"), show_alert=True)
+        return
+    await _answer_control(cb, db_user, await svc.skip("previous"), "ctl_skipped_prev")
+
+
+@router.callback_query(F.data == "ctl:like")
+async def cb_control_like(cb: CallbackQuery, session: AsyncSession, db_user: User) -> None:
+    svc, track = await _spotify_ctx(session, db_user)
+    if svc is None or track is None:
+        await cb.answer(t(lang_of(db_user), "ctl_no_spotify"), show_alert=True)
+        return
+    await _answer_control(cb, db_user, await svc.like_track(track), "ctl_liked")
