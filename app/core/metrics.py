@@ -87,8 +87,8 @@ class CircuitBreakerCollector:
 def _read_circuits() -> list[tuple[str, bool]]:
     # Локальный импорт — избегаем цикла (retry не зависит от metrics).
     from app.core.retry import (
+        CROSSLINK_CIRCUIT,
         LASTFM_CIRCUIT,
-        SONGLINK_CIRCUIT,
         SPOTIFY_CIRCUIT,
         YANDEX_CIRCUIT,
         YOUTUBE_CIRCUIT,
@@ -99,7 +99,7 @@ def _read_circuits() -> list[tuple[str, bool]]:
         ("yandex", YANDEX_CIRCUIT.is_open),
         ("youtube", YOUTUBE_CIRCUIT.is_open),
         ("lastfm", LASTFM_CIRCUIT.is_open),
-        ("songlink", SONGLINK_CIRCUIT.is_open),
+        ("crosslink", CROSSLINK_CIRCUIT.is_open),
     ]
 
 

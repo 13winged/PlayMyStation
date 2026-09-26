@@ -96,18 +96,16 @@ async def set_cached_audio_file_id(cache_key: str, file_id: str) -> None:
         log.debug("Failed to cache audio file_id for %s", cache_key)
 
 
-# ----- song.link cache (мэппинги треков между платформами, стабильны) -----
+# ----- platform links cache (кросс-матчинг треков, мэппинги стабильны) -----
 
-SONGLINK_CACHE_TTL = 7 * 24 * 3600
+PLATFORM_LINKS_CACHE_TTL = 7 * 24 * 3600
 
 
-async def get_cached_songlink(source_url: str) -> dict[str, str] | None:
+async def get_cached_platform_links(cache_key: str) -> dict[str, str] | None:
     """Закешированные ссылки {platform: url} или None."""
-    from app.services.songlink import songlink_cache_key
-
     r = await get_redis()
     try:
-        data = await r.get(songlink_cache_key(source_url))
+        data = await r.get(f"platform_links:{cache_key}")
     except Exception:  # noqa: BLE001 — кэш best-effort
         return None
     if data is None:
@@ -119,15 +117,13 @@ async def get_cached_songlink(source_url: str) -> dict[str, str] | None:
     return parsed if isinstance(parsed, dict) else None
 
 
-async def set_cached_songlink(source_url: str, links: dict[str, str]) -> None:
-    """Закешировать мэппинг на SONGLINK_CACHE_TTL."""
-    from app.services.songlink import songlink_cache_key
-
+async def set_cached_platform_links(cache_key: str, links: dict[str, str]) -> None:
+    """Закешировать мэппинг на PLATFORM_LINKS_CACHE_TTL."""
     r = await get_redis()
     try:
-        await r.setex(songlink_cache_key(source_url), SONGLINK_CACHE_TTL, json.dumps(links))
+        await r.setex(f"platform_links:{cache_key}", PLATFORM_LINKS_CACHE_TTL, json.dumps(links))
     except Exception:  # noqa: BLE001 — кэш best-effort
-        log.debug("Failed to cache songlink for %s", source_url)
+        log.debug("Failed to cache platform links for %s", cache_key)
 
 
 # ----- YouTube OAuth device-flow (ожидающие подтверждения) -----

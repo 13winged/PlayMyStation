@@ -31,8 +31,8 @@ from app.db import repositories as repo
 from app.db.models import User
 from app.services.audio import audio_cache_key, fetch_audio_bytes, safe_filename
 from app.services.base import TrackDTO
+from app.services.crosslink import match_same_track
 from app.services.factory import _safe_get_playing, build_service, resolve_now_playing
-from app.services.songlink import match_platform_links
 from app.services.spotify import SpotifyService
 
 router = Router()
@@ -124,20 +124,26 @@ def _schedule_download(message: Message, db_user: User, track: TrackDTO) -> None
     asyncio.create_task(_send_track_audio(message, db_user, track))
 
 
-def _schedule_platform_buttons(sent: Message, track: TrackDTO, lang: str) -> None:
-    if not track.track_url:
-        return
-    asyncio.create_task(_add_platform_buttons(sent, track, lang))
+def _yandex_token(integrations: list) -> str | None:
+    """Токен Яндекс-привязки юзера для поиска (дешифрованный)."""
+    integ = next((i for i in integrations if i.provider == "yandex"), None)
+    return repo.decrypted_access(integ) if integ is not None else None
 
 
-async def _add_platform_buttons(sent: Message, track: TrackDTO, lang: str) -> None:
+def _schedule_platform_buttons(
+    sent: Message, track: TrackDTO, lang: str, yandex_token: str | None
+) -> None:
+    asyncio.create_task(_add_platform_buttons(sent, track, lang, yandex_token))
+
+
+async def _add_platform_buttons(
+    sent: Message, track: TrackDTO, lang: str, yandex_token: str | None
+) -> None:
     """Фоном найти тот же трек на других платформах и докинуть кнопки. Best-effort."""
     try:
-        links = await match_platform_links(
-            track.track_url, exclude=(track.provider,)
-        )
+        links = await match_same_track(track, yandex_token)
     except Exception:
-        log.info("songlink match failed for '%s'", track.title, exc_info=True)
+        log.info("crosslink match failed for '%s'", track.title, exc_info=True)
         return
     if not links:
         return
@@ -152,7 +158,7 @@ async def _add_platform_buttons(sent: Message, track: TrackDTO, lang: str) -> No
             )
         )
     except TelegramAPIError:
-        log.info("songlink buttons edit failed (message gone?)")
+        log.info("platform buttons edit failed (message gone?)")
 
 
 async def _answer_now(message: Message, session: AsyncSession, db_user: User) -> None:
@@ -186,7 +192,7 @@ async def _answer_now(message: Message, session: AsyncSession, db_user: User) ->
     else:
         sent = await message.answer(track_card(track, lang), reply_markup=kb)
     _schedule_download(message, db_user, track)
-    _schedule_platform_buttons(sent, track, lang)
+    _schedule_platform_buttons(sent, track, lang, _yandex_token(integrations))
 
 
 @router.message(Command("now", "np"))
@@ -222,7 +228,7 @@ async def cb_now(cb: CallbackQuery, session: AsyncSession, db_user: User) -> Non
     else:
         sent = await cb.message.answer(track_card(track, lang), reply_markup=kb)
     _schedule_download(cb.message, db_user, track)
-    _schedule_platform_buttons(sent, track, lang)
+    _schedule_platform_buttons(sent, track, lang, _yandex_token(integrations))
 
 
 @router.callback_query(F.data == "dl:preview")
