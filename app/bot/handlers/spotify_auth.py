@@ -52,6 +52,13 @@ async def cmd_spotify(
 ) -> None:
     raw_args = (command.args or "").strip()
     if not raw_args:
+        integrations = await repo.list_integrations(session, db_user.id)
+        if "spotify" in {i.provider for i in integrations}:
+            await repo.set_active_provider(session, db_user, "spotify")
+            await session.commit()
+            await invalidate_now_playing_cache(db_user.telegram_id)
+            await message.answer("🟢 Активный сервис: <b>Spotify</b>. Жми /now 🎵")
+            return
         await message.answer(
             "🟢 Пришли код так:\n<code>/spotify &lt;код_из_адресной_строки&gt;</code>\n\n"
             "Где взять код:\n"

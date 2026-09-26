@@ -45,6 +45,13 @@ async def cmd_youtube(
 ) -> None:
     raw = (command.args or "").strip()
     if not raw:
+        integrations = await repo.list_integrations(session, db_user.id)
+        if "youtube" in {i.provider for i in integrations}:
+            await repo.set_active_provider(session, db_user, "youtube")
+            await session.commit()
+            await invalidate_now_playing_cache(db_user.telegram_id)
+            await message.answer("▶️ Активный сервис: <b>YouTube Music</b>. Жми /now 🎵")
+            return
         await message.answer(SETUP_HINT)
         return
 

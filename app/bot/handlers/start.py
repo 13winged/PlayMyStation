@@ -31,7 +31,7 @@ async def cmd_start(message: Message, session: AsyncSession, db_user: User) -> N
         "Команды:\n"
         "• /services — подключить / выбрать сервис\n"
         "• /now или /np — что сейчас играет (+ пришлю трек)\n"
-        "• /spotify /yandex /youtube /lastfm — подключить конкретный сервис\n"
+        "• /spotify /yandex /youtube /lastfm — выбрать сервис (или подключить)\n"
         "• /disconnect <provider> — отключить сервис",
         reply_markup=services_kb(bound, active),
     )

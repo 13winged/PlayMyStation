@@ -28,6 +28,13 @@ async def cmd_lastfm(
 ) -> None:
     username = (command.args or "").strip().strip('"').strip("'").split()[0] if command.args else ""
     if not username:
+        integrations = await repo.list_integrations(session, db_user.id)
+        if "lastfm" in {i.provider for i in integrations}:
+            await repo.set_active_provider(session, db_user, "lastfm")
+            await session.commit()
+            await invalidate_now_playing_cache(db_user.telegram_id)
+            await message.answer("🟪 Активный сервис: <b>Last.fm</b>. Жми /now 🎵")
+            return
         await message.answer(
             "🟪 Пришли username так:\n<code>/lastfm &lt;твой_lastfm_username&gt;</code>\n\n"
             "Где взять: Paper Planes → Last.fm → Settings → профиль. "

@@ -19,10 +19,10 @@ BOT_COMMANDS: list[BotCommand] = [
     BotCommand(command="services", description="Подключить и выбрать сервис"),
     BotCommand(command="now", description="Что сейчас играет (+ пришлю трек)"),
     BotCommand(command="np", description="Короткое /now"),
-    BotCommand(command="spotify", description="Подключить Spotify по коду"),
-    BotCommand(command="yandex", description="Подключить Яндекс Музыку по токену"),
-    BotCommand(command="youtube", description="Подключить YouTube Music"),
-    BotCommand(command="lastfm", description="Подключить Last.fm по username"),
+    BotCommand(command="spotify", description="Spotify: выбрать / подключить"),
+    BotCommand(command="yandex", description="Яндекс: выбрать / подключить"),
+    BotCommand(command="youtube", description="YouTube: выбрать / подключить"),
+    BotCommand(command="lastfm", description="Last.fm: выбрать / подключить"),
     BotCommand(command="disconnect", description="Отключить сервис"),
 ]
 

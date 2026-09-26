@@ -7,6 +7,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.redis import invalidate_now_playing_cache
 from app.db import repositories as repo
 from app.db.models import User
 from app.services.yandex import YandexMusicService
@@ -33,6 +34,13 @@ async def cmd_yandex(
 ) -> None:
     token = extract_yandex_token(command.args or "")
     if not token:
+        integrations = await repo.list_integrations(session, db_user.id)
+        if "yandex" in {i.provider for i in integrations}:
+            await repo.set_active_provider(session, db_user, "yandex")
+            await session.commit()
+            await invalidate_now_playing_cache(db_user.telegram_id)
+            await message.answer("🔴 Активный сервис: <b>Яндекс Музыка</b>. Жми /now 🎵")
+            return
         await message.answer("🔴 Пришли токен так:\n<code>/yandex &lt;твой_токен&gt;</code>")
         return
     # Быстрая проверка токена перед сохранением
