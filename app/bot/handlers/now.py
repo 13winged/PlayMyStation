@@ -26,6 +26,7 @@ from app.db.models import User
 from app.services.audio import audio_cache_key, fetch_audio_bytes, safe_filename
 from app.services.base import TrackDTO
 from app.services.factory import build_service, resolve_now_playing
+from app.services.songlink import match_platform_links
 
 router = Router()
 
@@ -116,6 +117,31 @@ def _schedule_download(message: Message, db_user: User, track: TrackDTO) -> None
     asyncio.create_task(_send_track_audio(message, db_user, track))
 
 
+def _schedule_platform_buttons(sent: Message, track: TrackDTO) -> None:
+    if not track.track_url:
+        return
+    asyncio.create_task(_add_platform_buttons(sent, track))
+
+
+async def _add_platform_buttons(sent: Message, track: TrackDTO) -> None:
+    """Фоном найти тот же трек на других платформах и докинуть кнопки. Best-effort."""
+    try:
+        links = await match_platform_links(
+            track.track_url, exclude=(track.provider,)
+        )
+    except Exception:
+        log.info("songlink match failed for '%s'", track.title, exc_info=True)
+        return
+    if not links:
+        return
+    try:
+        await sent.edit_reply_markup(
+            reply_markup=track_kb(bool(track.preview_url), links)
+        )
+    except TelegramAPIError:
+        log.info("songlink buttons edit failed (message gone?)")
+
+
 async def _answer_now(message: Message, session: AsyncSession, db_user: User) -> None:
     integrations = await repo.list_integrations(session, db_user.id)
     if not integrations:
@@ -136,12 +162,13 @@ async def _answer_now(message: Message, session: AsyncSession, db_user: User) ->
         return
     kb = track_kb(has_preview=bool(track.preview_url))
     if track.cover_url:
-        await message.answer_photo(
+        sent = await message.answer_photo(
             photo=track.cover_url, caption=track_card(track), reply_markup=kb
         )
     else:
-        await message.answer(track_card(track), reply_markup=kb)
+        sent = await message.answer(track_card(track), reply_markup=kb)
     _schedule_download(message, db_user, track)
+    _schedule_platform_buttons(sent, track)
 
 
 @router.message(Command("now", "np"))
@@ -165,12 +192,13 @@ async def cb_now(cb: CallbackQuery, session: AsyncSession, db_user: User) -> Non
         return
     kb = track_kb(has_preview=bool(track.preview_url))
     if track.cover_url:
-        await cb.message.answer_photo(
+        sent = await cb.message.answer_photo(
             photo=track.cover_url, caption=track_card(track), reply_markup=kb
         )
     else:
-        await cb.message.answer(track_card(track), reply_markup=kb)
+        sent = await cb.message.answer(track_card(track), reply_markup=kb)
     _schedule_download(cb.message, db_user, track)
+    _schedule_platform_buttons(sent, track)
 
 
 @router.callback_query(F.data == "dl:preview")

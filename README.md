@@ -26,7 +26,7 @@ python -m app.main
 - `app/db/models.py` — `users` (telegram_id, active_provider) + `integrations` (UniqueConstraint user+provider)
 - `alembic/versions/` — миграции БД (применяются при старте, вместо `create_all`)
 - `app/services/base.py` — `TrackDTO` (+`preview_url`) + `BaseMusicService.get_currently_playing()`
-- `app/services/spotify.py | yandex.py | youtube.py | lastfm.py` — 4 стратегии + `audio.py` (скачивание превью с лимитом)
+- `app/services/spotify.py | yandex.py | youtube.py | lastfm.py` — 4 стратегии + `audio.py` (скачивание) + `songlink.py` (матчинг «этот же трек на …», кеш Redis 7 дней)
 - `app/services/ynison/` — gRPC-клиент нативного протокола Яндекс Музыки + Go-сайдкар `ynison-proxy/` (realtime: трек + прогресс + пауза)
 - `app/services/factory.py` — `build_service()` + `resolve_now_playing()` (режим `all` опрашивает всё параллельно, приоритет `is_playing=True`); результат кешируется в Redis на ~20 сек
 - `app/core/retry.py` — ретраи httpx (exponential backoff, `Retry-After`) + circuit-breaker для внешних API

@@ -57,12 +57,20 @@ def now_empty_kb() -> InlineKeyboardMarkup:
     )
 
 
-def track_kb(has_preview: bool) -> InlineKeyboardMarkup:
-    """Клавиатура под карточкой трека: превью (если есть) + сервисы."""
+def track_kb(has_preview: bool, platform_links: dict[str, str] | None = None) -> InlineKeyboardMarkup:
+    """Клавиатура под карточкой трека: превью + другие платформы + сервисы."""
     rows: list[list[InlineKeyboardButton]] = []
     if has_preview:
         rows.append(
             [InlineKeyboardButton(text="⏬ Превью (30 сек)", callback_data="dl:preview")]
         )
+    if platform_links:
+        buttons = [
+            InlineKeyboardButton(text=f"{PROVIDER_META[p][1]} {PROVIDER_META[p][0]}", url=url)
+            for p, url in platform_links.items()
+            if p in PROVIDER_META
+        ]
+        if buttons:
+            rows.append(buttons)
     rows.append([InlineKeyboardButton(text="⚙️ Мои сервисы", callback_data="svc:back")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
