@@ -28,7 +28,7 @@ async def get_user_by_telegram_id(session: AsyncSession, telegram_id: int) -> Us
 
 
 async def set_active_provider(session: AsyncSession, user: User, provider: str) -> User:
-    if provider not in ("spotify", "yandex", "soundcloud", "lastfm", "all"):
+    if provider not in ("spotify", "yandex", "youtube", "lastfm", "all"):
         raise ValueError(f"Unknown provider: {provider}")
     user.active_provider = provider
     await session.flush()

@@ -2,8 +2,7 @@
 
 Честные ограничения (ToS сервисов):
 - Spotify — только 30-секундное `preview_url` из официального API.
-- SoundCloud — только `download_url` треков с `downloadable=True`.
-- Яндекс Музыка — скачивания нет, только ссылка на трек.
+- Яндекс Музыка и YouTube Music — скачивания нет, только ссылка на трек.
 """
 
 from __future__ import annotations

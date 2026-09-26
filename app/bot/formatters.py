@@ -6,7 +6,7 @@ import html
 
 from app.services.base import TrackDTO
 
-PROVIDER_ICON = {"spotify": "🟢", "yandex": "🔴", "soundcloud": "🟠", "lastfm": "🟪"}
+PROVIDER_ICON = {"spotify": "🟢", "yandex": "🔴", "youtube": "▶️", "lastfm": "🟪"}
 
 BAR_LEN = 12
 FILLED = "━"
@@ -36,7 +36,7 @@ def track_card(track: TrackDTO) -> str:
         {
             "spotify": "Spotify",
             "yandex": "Яндекс Музыка",
-            "soundcloud": "SoundCloud",
+            "youtube": "YouTube Music",
             "lastfm": "Last.fm",
         }.get(track.provider, track.provider),
         quote=False,
@@ -58,6 +58,6 @@ def track_card(track: TrackDTO) -> str:
     if track.track_url:
         safe_url = html.escape(track.track_url, quote=True)
         lines.append(f'🔗 <a href="{safe_url}">Открыть трек</a>')
-    elif track.provider == "soundcloud" and not track.is_playing:
-        lines.append("ℹ️ SoundCloud не отдаёт realtime-статус — показан последний трек.")
+    elif track.provider == "youtube" and not track.is_playing:
+        lines.append("ℹ️ YouTube Music не отдаёт realtime-статус — показан последний трек из истории.")
     return "\n".join(lines)

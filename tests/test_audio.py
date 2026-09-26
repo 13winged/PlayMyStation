@@ -1,7 +1,7 @@
-"""Тесты скачивания превью и SoundCloud-маппинга download_url."""
+"""Тесты скачивания превью и YouTube Music-маппинга истории."""
 
 from app.services.audio import safe_filename
-from app.services.soundcloud import SoundCloudService
+from app.services.youtube import YouTubeMusicService
 
 
 def test_safe_filename_strips_forbidden_chars() -> None:
@@ -22,36 +22,48 @@ def test_safe_filename_truncates_long_names() -> None:
     assert name.endswith(".mp3")
 
 
-def test_soundcloud_dto_with_downloadable() -> None:
-    """download_url пробрасывается только если автор разрешил скачивание."""
+def test_youtube_dto_full_history_item() -> None:
+    """Полный item истории маппится в TrackDTO."""
     raw = {
-        "title": "Track",
-        "user": {"username": "Artist"},
-        "permalink_url": "https://soundcloud.com/a/t",
-        "downloadable": True,
-        "download_url": "https://api.soundcloud.com/tracks/1/download",
+        "videoId": "dQw4w9WgXcQ",
+        "title": "Never Gonna Give You Up",
+        "artists": [{"name": "Rick Astley", "id": "UCuAXFkgpKOUHtEU4457amMuo"}],
+        "album": {"name": "Whenever You Need Somebody", "id": "MPREb_123"},
+        "duration_seconds": 213,
+        "thumbnails": [
+            {"url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/default.jpg", "width": 120, "height": 90},
+            {"url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", "width": 480, "height": 360},
+        ],
     }
-    dto = SoundCloudService._to_dto(raw, is_playing=False)
-    assert dto.preview_url == "https://api.soundcloud.com/tracks/1/download"
+    dto = YouTubeMusicService._to_dto(raw)
+    assert dto.title == "Never Gonna Give You Up"
+    assert dto.artist == "Rick Astley"
+    assert dto.album == "Whenever You Need Somebody"
+    assert dto.duration_ms == 213_000
+    assert dto.is_playing is False
+    assert dto.provider == "youtube"
+    assert dto.preview_url is None
+    assert dto.track_url == "https://music.youtube.com/watch?v=dQw4w9WgXcQ"
+    assert dto.cover_url == "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
 
 
-def test_soundcloud_dto_without_downloadable() -> None:
-    """Без флага downloadable качать нельзя — preview_url None."""
+def test_youtube_dto_multiple_artists_and_missing_fields() -> None:
+    """Несколько артистов склеиваются; пустой item даёт дефолты."""
     raw = {
-        "title": "Track",
-        "user": {"username": "Artist"},
-        "permalink_url": "https://soundcloud.com/a/t",
-        "downloadable": False,
-        "download_url": "https://api.soundcloud.com/tracks/1/download",
+        "videoId": "abc123",
+        "title": "Collab",
+        "artists": [{"name": "A"}, {"name": "B"}],
     }
-    dto = SoundCloudService._to_dto(raw, is_playing=False)
-    assert dto.preview_url is None
+    dto = YouTubeMusicService._to_dto(raw)
+    assert dto.artist == "A, B"
+    assert dto.album is None
+    assert dto.duration_ms is None
+    assert dto.cover_url is None
 
-
-def test_soundcloud_dto_missing_download_fields() -> None:
-    raw = {"title": "Track", "user": {"username": "Artist"}}
-    dto = SoundCloudService._to_dto(raw, is_playing=False)
-    assert dto.preview_url is None
+    dto_empty = YouTubeMusicService._to_dto({})
+    assert dto_empty.title == "Unknown title"
+    assert dto_empty.artist == "Unknown artist"
+    assert dto_empty.track_url is None
 
 
 def test_extract_code_bare() -> None:

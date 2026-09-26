@@ -72,18 +72,18 @@ def test_track_card_yandex_not_playing() -> None:
     assert "4:00" in card
 
 
-def test_track_card_soundcloud_last_played() -> None:
+def test_track_card_youtube_last_played() -> None:
     track = TrackDTO(
-        title="SC Track",
-        artist="SC User",
+        title="YT Track",
+        artist="YT Artist",
         is_playing=False,
-        provider="soundcloud",
+        provider="youtube",
     )
     card = track_card(track)
-    assert "🟠" in card
-    assert "SoundCloud" in card
+    assert "▶️" in card
+    assert "YouTube Music" in card
     assert "Последний трек" in card
-    assert "SoundCloud не отдаёт realtime" in card
+    assert "не отдаёт realtime" in card
 
 
 def test_track_card_without_optional_fields() -> None:

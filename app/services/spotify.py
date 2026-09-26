@@ -202,7 +202,7 @@ class SpotifyService(BaseMusicService):
 
         `recently-played` работает и на free-аккаунтах (нужен скоуп
         user-read-recently-played). Возвращает последний трек
-        с is_playing=False — честный UX «последний трек», как у SoundCloud.
+        с is_playing=False — честный UX «последний трек», как у YouTube Music.
         """
         client = await _get_spotify_client()
 

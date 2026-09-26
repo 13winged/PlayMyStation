@@ -16,10 +16,9 @@ class TrackDTO:
     is_playing: bool = False
     cover_url: str | None = None
     track_url: str | None = None
-    provider: str = "unknown"  # spotify | yandex | soundcloud | lastfm
+    provider: str = "unknown"  # spotify | yandex | youtube | lastfm
     # Прямая ссылка на воспроизводимое аудио, если сервис её отдаёт:
-    # Spotify — 30-секундное preview_url, SoundCloud — download_url
-    # (только для треков с downloadable=True). У Яндекса — всегда None.
+    # Spotify — 30-секундное preview_url. У Яндекса/YouTube/Last.fm — всегда None.
     preview_url: str | None = None
 
 

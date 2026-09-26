@@ -65,20 +65,36 @@ async def test_build_service_yandex_returns_service() -> None:
 
 
 @pytest.mark.asyncio
-async def test_build_service_soundcloud_returns_service() -> None:
-    """build_service создаёт SoundCloudService с токеном."""
+async def test_build_service_youtube_returns_service() -> None:
+    """build_service создаёт YouTubeMusicService с auth-JSON."""
     integration = Integration(
         id=1,
         user_id=1,
-        provider="soundcloud",
-        access_token="encrypted_token",
+        provider="youtube",
+        access_token="encrypted_auth",
     )
     session = MagicMock(spec=AsyncSession)
 
-    with patch("app.services.factory.repo.decrypted_access", return_value="valid_token"):
+    with patch("app.services.factory.repo.decrypted_access", return_value='{"cookie": "x"}'):
         result = await build_service(integration, session)
         assert result is not None
-        assert result.provider == "soundcloud"
+        assert result.provider == "youtube"
+
+
+@pytest.mark.asyncio
+async def test_build_service_youtube_returns_none_when_no_auth() -> None:
+    """build_service возвращает None, если нет auth-JSON."""
+    integration = Integration(
+        id=1,
+        user_id=1,
+        provider="youtube",
+        access_token=None,
+    )
+    session = MagicMock(spec=AsyncSession)
+
+    with patch("app.services.factory.repo.decrypted_access", return_value=None):
+        result = await build_service(integration, session)
+        assert result is None
 
 
 @pytest.mark.asyncio

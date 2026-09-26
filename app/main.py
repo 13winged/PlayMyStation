@@ -20,16 +20,15 @@ from alembic.config import Config
 from alembic import command
 from app.bot.handlers import lastfm_auth as lastfm_handlers
 from app.bot.handlers import now as now_handlers
-from app.bot.handlers import soundcloud_auth as soundcloud_handlers
 from app.bot.handlers import spotify_auth as spotify_handlers
 from app.bot.handlers import start as start_handlers
 from app.bot.handlers import yandex_auth as yandex_handlers
+from app.bot.handlers import youtube_auth as youtube_handlers
 from app.bot.middlewares import DbSessionMiddleware, EnsureUserMiddleware
 from app.core.config import get_settings
 from app.core.db import SessionFactory
 from app.core.redis import close_redis, get_redis
 from app.services.lastfm import close_lastfm_client
-from app.services.soundcloud import close_soundcloud_client
 from app.services.spotify import close_spotify_client
 from app.web.app import create_web_app, set_webhook_bot, set_webhook_dispatcher
 
@@ -81,7 +80,7 @@ def create_dispatcher() -> Dispatcher:
         now_handlers.router,
         yandex_handlers.router,
         spotify_handlers.router,
-        soundcloud_handlers.router,
+        youtube_handlers.router,
         lastfm_handlers.router,
     )
     return dp
@@ -168,7 +167,6 @@ async def shutdown_resources(bot: Bot | None = None) -> None:
 
     await close_redis()
     await close_spotify_client()
-    await close_soundcloud_client()
     await close_lastfm_client()
 
     # Даем время на завершение pending задач

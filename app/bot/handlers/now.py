@@ -79,8 +79,7 @@ async def cb_preview(cb: CallbackQuery, session: AsyncSession, db_user: User) ->
 
     Трек берём из Redis-кэша /now (TTL 20с): URL в callback_data не влезет
     (лимит 64 байта), поэтому переиспользуем закешированный результат.
-    Легальность: Spotify — официальное 30-сек preview_url;
-    SoundCloud — только download_url треков с downloadable=True.
+    Легальность: только официальное 30-сек preview_url Spotify.
     """
     await cb.answer("⏬ Качаю превью…")
     integrations = await repo.list_integrations(session, db_user.id)
@@ -93,8 +92,7 @@ async def cb_preview(cb: CallbackQuery, session: AsyncSession, db_user: User) ->
     if track is None or not track.preview_url:
         await cb.message.answer(
             "ℹ️ Превью недоступно для этого трека.\n"
-            "Spotify отдаёт превью не для всех треков, "
-            "а SoundCloud — только если автор разрешил скачивание."
+            "Spotify отдаёт превью не для всех треков."
         )
         return
     data = await fetch_audio_bytes(track.preview_url)

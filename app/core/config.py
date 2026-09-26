@@ -27,13 +27,6 @@ class Settings(BaseSettings):
         default="http://localhost:8000/oauth/spotify/callback", alias="SPOTIFY_REDIRECT_URI"
     )
 
-    soundcloud_client_id: str = Field(default="", alias="SOUNDCLOUD_CLIENT_ID")
-    soundcloud_client_secret: str = Field(default="", alias="SOUNDCLOUD_CLIENT_SECRET")
-    soundcloud_redirect_uri: str = Field(
-        default="http://localhost:8000/oauth/soundcloud/callback",
-        alias="SOUNDCLOUD_REDIRECT_URI",
-    )
-
     # Last.fm: только API-ключ сервера + username юзера (OAuth не нужен)
     lastfm_api_key: str = Field(default="", alias="LASTFM_API_KEY")
 

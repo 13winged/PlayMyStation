@@ -4,7 +4,7 @@
 отдаёт `user.getrecenttracks` всем бесплатно — достаточно username, OAuth
 не нужен. Юзер один раз связывает Spotify → Last.fm (скробблинг), бот читает
 историю. Трек с флагом `@attr.nowplaying` считаем играющим прямо сейчас,
-остальное — «последний трек» (честно, как у SoundCloud).
+остальное — «последний трек» (честно, как у YouTube Music).
 """
 
 from __future__ import annotations

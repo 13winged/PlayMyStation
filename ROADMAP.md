@@ -6,8 +6,8 @@
 ## Milestone 0 — MVP scaffold ✅
 - [x] Модели `users` + `integrations` (UniqueConstraint user+provider)
 - [x] `BaseMusicService` + `TrackDTO` (+`preview_url`) + 4 стратегии + `factory.resolve_now_playing()` + bulkhead-таймауты + circuit-breakers
-- [x] Бот: `/start /services /now /np /yandex /spotify /lastfm`, inline-статусы, выбор `active_provider/all`, кнопка «⏬ Превью», удаление секретов из чата
-- [x] FastAPI OAuth callbacks Spotify/SoundCloud, шифрование токенов (Fernet)
+- [x] Бот: `/start /services /now /np /yandex /spotify /youtube /lastfm`, inline-статусы, выбор `active_provider/all`, кнопка «⏬ Превью», удаление секретов из чата
+- [x] FastAPI OAuth callback Spotify, шифрование токенов (Fernet)
 - [x] `docker-compose`: postgres + redis + app; `app/main.py` (polling + uvicorn)
 
 ## Milestone 1 — Auth & надежность ✅
@@ -32,8 +32,8 @@
 - [ ] **Кеш аудио через Telegram-канал** — скачанное отправляется в приватный канал, повторная отдача по `file_id`
 - [ ] Скачивание полных треков — **отклонено**: оценён открытый uDownloader/yt-dlp
   (`song.link`-матчинг → yt-dlp → кеш-канал), но скачивание с YouTube нарушает его ToS,
-  риски несёт владелец. Остаёмся на легальном: Spotify `preview_url` + SoundCloud
-  `download_url` (подробности в README). Пересмотр — только осознанным решением владельца
+  риски несёт владелец. Остаёмся на легальном: только Spotify `preview_url`
+  (подробности в README). Пересмотр — только осознанным решением владельца
 
 ## Milestone 3 — Продакшн
 - [x] Webhook-режим (сертификат, секрет) + dual polling/webhook + graceful shutdown
@@ -51,6 +51,6 @@
 
 ## Риски
 1. Яндекс: неофициальный API + reverse-engineered Ynison — может сломаться при изменениях у Яндекса (фолбэк на очередь остаётся); токены короткоживущие.
-2. SoundCloud: нет realtime → честный UX «последний трек», не обещать live.
+2. YouTube Music: нет realtime → честный UX «последний трек», не обещать live; browser-auth кука живёт ~2 года.
 3. Spotify: dev-mode требует Premium владельца + allowlist до 5 юзеров; скоупы `currently-playing + playback-state + recently-played`.
 4. Деплой: не использовать `down -v` (сносит БД и сертификаты); миграции Alembic всегда коммитить.

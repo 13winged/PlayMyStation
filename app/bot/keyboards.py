@@ -7,7 +7,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 PROVIDER_META: dict[str, tuple[str, str]] = {
     "spotify": ("Spotify", "🟢"),
     "yandex": ("Яндекс Музыка", "🔴"),
-    "soundcloud": ("SoundCloud", "🟠"),
+    "youtube": ("YouTube Music", "▶️"),
     "lastfm": ("Last.fm", "🟪"),
 }
 

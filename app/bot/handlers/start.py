@@ -8,11 +8,9 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.keyboards import connect_kb, services_kb
-from app.core.config import get_settings
 from app.core.redis import invalidate_now_playing_cache
 from app.db import repositories as repo
 from app.db.models import User
-from app.services.soundcloud import build_authorize_url as sc_auth_url
 from app.services.spotify import build_authorize_url as sp_auth_url
 
 router = Router()
@@ -28,7 +26,7 @@ async def cmd_start(message: Message, session: AsyncSession, db_user: User) -> N
     bound, active = _bound_and_active(db_user, integrations)
     await message.answer(
         "👋 <b>PlayMyStation</b>\n\n"
-        "Подключи до 4 аккаунтов: Spotify, Яндекс Музыку, SoundCloud и Last.fm.\n"
+        "Подключи до 4 аккаунтов: Spotify, Яндекс Музыку, YouTube Music и Last.fm.\n"
         "Выбери активный сервис или режим <b>ALL</b> — тогда /now найдёт тот, где музыка играет прямо сейчас.\n\n"
         "Команды:\n"
         "• /services — подключить / выбрать сервис\n"
@@ -53,9 +51,9 @@ async def cmd_services(message: Message, session: AsyncSession, db_user: User) -
 async def cmd_disconnect(
     message: Message, command: CommandObject, session: AsyncSession, db_user: User
 ) -> None:
-    """Отключить сервис: /disconnect spotify|yandex|soundcloud|lastfm"""
+    """Отключить сервис: /disconnect spotify|yandex|youtube|lastfm"""
     provider = (command.args or "").strip().lower()
-    valid_providers = ("spotify", "yandex", "soundcloud", "lastfm")
+    valid_providers = ("spotify", "yandex", "youtube", "lastfm")
 
     if provider not in valid_providers:
         await message.answer(
@@ -118,7 +116,6 @@ async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> 
     provider = (cb.data or "").split(":")[-1]
     integrations = await repo.list_integrations(session, db_user.id)
     bound = {i.provider for i in integrations}
-    settings = get_settings()
 
     if provider in bound:
         # Отключаем
@@ -154,14 +151,17 @@ async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> 
             "<code>/spotify <код></code>.",
             connect_kb(provider, url),
         )
-    elif provider == "soundcloud":
-        if not settings.soundcloud_client_id:
-            await cb.answer("SoundCloud OAuth не настроен (.env)", show_alert=True)
-            return
-        url = sc_auth_url(state=str(cb.from_user.id))
+    elif provider == "youtube":
         await _edit_msg(
-            "🟠 <b>Подключение SoundCloud</b>\nНажми кнопку и подтверди доступ.",
-            connect_kb(provider, url),
+            "▶️ <b>Подключение YouTube Music</b>\n\n"
+            "1. Открой <code>music.youtube.com</code> в браузере и войди в аккаунт\n"
+            "2. Открой DevTools (Ctrl+Shift+I) → Network, в фильтр введи "
+            "<code>/browse</code>\n"
+            "3. Обнови страницу, найди POST-запрос <code>browse?...</code> и скопируй "
+            "заголовки (достаточно строк <code>cookie:</code> и "
+            "<code>x-goog-authuser:</code>)\n"
+            "4. Пришли их боту командой:\n"
+            "<code>/youtube &lt;заголовки&gt;</code>"
         )
     elif provider == "yandex":
         await _edit_msg(
