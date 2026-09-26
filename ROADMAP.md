@@ -37,7 +37,7 @@
 ## Milestone 3 — Продакшн
 - [x] Webhook-режим (сертификат, секрет) + dual polling/webhook + graceful shutdown
 - [x] CI (ruff/pytest/docker build) + CD на VPS через GitHub Actions (SSH + Deploy Key) + Caddy (https)
-- [ ] Метрики Prometheus + Sentry, структурированные логи (structlog)
+- [x] Метрики Prometheus (`/metrics`: апдейты, провайдеры, кэш, circuit breakers, HTTP) + Sentry (по `SENTRY_DSN`) + structlog (`LOG_FORMAT=json`) + пробы `/health`/`/ready`
 - [ ] Бэкапы Postgres
 - [ ] Ротация Fernet-ключей, audit-log подключений
 

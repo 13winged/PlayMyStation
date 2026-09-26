@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.metrics import Timer, count_cache, observe_provider
 from app.core.redis import get_cached_now_playing, set_cached_now_playing
 from app.db import repositories as repo
 from app.db.models import Integration
@@ -27,11 +28,15 @@ NOW_PLAYING_TIMEOUT = 10.0
 
 async def _safe_get_playing(service: BaseMusicService) -> TrackDTO | None:
     """Опрос одного сервиса с таймаутом. Любая ошибка/таймаут → None."""
+    timer = Timer()
     try:
         track = await asyncio.wait_for(service.get_currently_playing(), timeout=NOW_PLAYING_TIMEOUT)
     except (TimeoutError, Exception):  # noqa: BLE001 — один сервис не должен ронять /now
         log.info("provider %s failed/timeout", service.provider)
+        observe_provider(service.provider, timer.elapsed(), "error")
         return None
+    result = "ok" if track is not None else "none"
+    observe_provider(service.provider, timer.elapsed(), result)
     log.info(
         "provider %s -> %s",
         service.provider,
@@ -102,7 +107,9 @@ async def resolve_now_playing(
     if telegram_id is not None:
         cached = await get_cached_now_playing(telegram_id)
         if cached is not None:
+            count_cache("hit")
             return cached
+        count_cache("miss")
 
     if active_provider != "all":
         targets = [i for i in integrations if i.provider == active_provider]

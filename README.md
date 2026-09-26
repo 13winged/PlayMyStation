@@ -98,8 +98,20 @@ WEBHOOK_PATH=/webhook
 
 ⚠️ **Важно про Spotify**: Redirect URI, отличные от `localhost`, обязаны быть `https` — иначе Spotify их отклонит. Поэтому прод требует **домен + Caddy** (уже в compose). После деплоя добавь `https://<DOMAIN>/oauth/spotify/callback` в Spotify Dashboard → Settings → Redirect URIs.
 
-## Эксплуатация (выученные уроки)
-- **Никогда `docker compose down -v` на проде**: сносит volume `pgdata` (все пользователи и интеграции) и `caddy_data` (Let's Encrypt сертификаты → TLS ляжет + rate limit на перевыпуск). Деплой-скрипт чистит только контейнеры и дублирующиеся сети, volumes не трогает.
+## Мониторинг
+
+- **Prometheus**: метрики на `GET /metrics` (`pms_bot_updates_total`,
+  `pms_provider_now_playing_total{provider,result}`, `pms_now_playing_cache_total`,
+  `pms_circuit_breaker_open{provider}`, HTTP-латентности). Скрапинг — любым
+  Prometheus/VictoriaMetrics с таргетом на `http://<host>:8000/metrics`.
+- **Sentry**: включается через `SENTRY_DSN` в `.env` (release `playmystation@<version>`,
+  traces 20%, без PII). Без DSN — no-op.
+- **Логи**: `LOG_FORMAT=text` (по умолчанию, читаемые) или `json` (structlog,
+  для прода/Loki). Существующие `logging`-вызовы работают в обоих режимах.
+- **Пробы**: `/health` (liveness, всегда 200) и `/ready` (проверяет PostgreSQL
+  и Redis, 503 если недоступны) — для Docker healthcheck и балансировщиков.
+
+## Эксплуатация (выученные уроки)- **Никогда `docker compose down -v` на проде**: сносит volume `pgdata` (все пользователи и интеграции) и `caddy_data` (Let's Encrypt сертификаты → TLS ляжет + rate limit на перевыпуск). Деплой-скрипт чистит только контейнеры и дублирующиеся сети, volumes не трогает.
 - **Дубли сетей**: после упавших деплоев могут остаться две сети `playmystation_default` (`network ... is ambiguous`). Чинятся удалением по ID: `docker network ls --filter name=playmystation -q | xargs -r docker network rm` (уже встроено в deploy).
 - **Миграции Alembic — в git**: `alembic/versions/*.py` обязаны коммититься, иначе `upgrade head` на сервере — no-op и таблиц не будет (`relation "users" does not exist`).
 - **Telegram HTML**: любой динамический текст (названия треков!) и плейсхолдеры (`<provider>`, `<токен>`) экранировать (`&lt;...&gt;`, `html.escape`), иначе `Bad Request: can't parse entities` и 500 на каждый апдейт.

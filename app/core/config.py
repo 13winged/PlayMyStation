@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # Last.fm: только API-ключ сервера + username юзера (OAuth не нужен)
     lastfm_api_key: str = Field(default="", alias="LASTFM_API_KEY")
 
+    # Наблюдаемость (Milestone 3): Sentry DSN + формат логов (text|json)
+    sentry_dsn: str = Field(default="", alias="SENTRY_DSN")
+    log_format: str = Field(default="text", alias="LOG_FORMAT")
+
     # Ynison-прокси (Go-сайдкар): транспорт для gRPC-стримов нативного
     # протокола Яндекс Музыки. В compose доступен как сервис `ynison`.
     ynison_proxy_host: str = Field(default="ynison", alias="YNISON_PROXY_HOST")

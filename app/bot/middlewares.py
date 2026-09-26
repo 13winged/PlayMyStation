@@ -9,6 +9,13 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.metrics import (
+    Timer,
+    bot_update_duration_seconds,
+    bot_update_errors_total,
+    bot_updates_total,
+    describe_update,
+)
 from app.db import repositories as repo
 
 
@@ -45,3 +52,24 @@ class EnsureUserMiddleware(BaseMiddleware):
             await session.commit()
             data["db_user"] = db_user
         return await handler(event, data)
+
+
+class MetricsMiddleware(BaseMiddleware):
+    """Считает апдейты/ошибки/латентность для Prometheus (уровень update)."""
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        update_type, command = describe_update(event)
+        timer = Timer()
+        try:
+            result = await handler(event, data)
+        except Exception:
+            bot_update_errors_total.labels(update_type, command).inc()
+            raise
+        bot_updates_total.labels(update_type, command).inc()
+        bot_update_duration_seconds.labels(update_type, command).observe(timer.elapsed())
+        return result

@@ -24,9 +24,10 @@ from app.bot.handlers import spotify_auth as spotify_handlers
 from app.bot.handlers import start as start_handlers
 from app.bot.handlers import yandex_auth as yandex_handlers
 from app.bot.handlers import youtube_auth as youtube_handlers
-from app.bot.middlewares import DbSessionMiddleware, EnsureUserMiddleware
+from app.bot.middlewares import DbSessionMiddleware, EnsureUserMiddleware, MetricsMiddleware
 from app.core.config import get_settings
 from app.core.db import SessionFactory
+from app.core.observability import configure_structlog, init_sentry
 from app.core.redis import close_redis, get_redis
 from app.services.lastfm import close_lastfm_client
 from app.services.spotify import close_spotify_client
@@ -42,12 +43,14 @@ def setup_logging() -> None:
     Alembic вызывает logging.config.fileConfig(), который сносит хендлеры
     root-логгера и ставит level=WARNING — после миграций наши INFO-логи
     глохнут. Поэтому перенастраиваемся заново (force=True).
+    Плюс конфигурируем structlog (JSON при LOG_FORMAT=json).
     """
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         force=True,
     )
+    configure_structlog()
 
 
 def run_alembic_upgrade() -> None:
@@ -71,6 +74,7 @@ def create_dispatcher() -> Dispatcher:
     except Exception:  # noqa: BLE001
         storage = MemoryStorage()  # type: ignore[assignment]
     dp = Dispatcher(storage=storage)
+    dp.update.middleware(MetricsMiddleware())
     dp.message.middleware(DbSessionMiddleware(SessionFactory))
     dp.callback_query.middleware(DbSessionMiddleware(SessionFactory))
     dp.message.middleware(EnsureUserMiddleware())
@@ -177,6 +181,7 @@ async def shutdown_resources(bot: Bot | None = None) -> None:
 async def main() -> None:
     await init_db()
     setup_logging()  # Alembic снёс хендлеры root-логгера — восстанавливаем
+    init_sentry()  # no-op без SENTRY_DSN
 
     settings = get_settings()
     bot = Bot(
