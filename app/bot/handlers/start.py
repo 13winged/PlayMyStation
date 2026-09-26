@@ -158,8 +158,8 @@ async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> 
             "2. Открой DevTools (Ctrl+Shift+I) → Network, в фильтр введи "
             "<code>/browse</code>\n"
             "3. Обнови страницу, найди POST-запрос <code>browse?...</code> и скопируй "
-            "заголовки (достаточно строк <code>cookie:</code> и "
-            "<code>x-goog-authuser:</code>)\n"
+            "заголовки ЦЕЛИКОМ (включая <code>authorization:</code>, "
+            "<code>cookie:</code> и <code>x-goog-authuser:</code>)\n"
             "4. Пришли их боту командой:\n"
             "<code>/youtube &lt;заголовки&gt;</code>"
         )

@@ -29,14 +29,23 @@ def build_auth_json(headers_raw: str) -> str:
     """Превратить скопированные заголовки браузера в auth-JSON.
 
     Синхронная: вызывает `ytmusicapi.setup(headers_raw=...)`.
-    Бросает ValueError, если заголовки не parse'ятся (нет cookie и т.п.).
+    Нужны ПОЛНЫЕ заголовки запроса /browse (включая `authorization: SAPISIDHASH...`,
+    `cookie:` и `x-goog-authuser:`) — иначе YTMusic не признает browser-auth.
+    Бросает ValueError, если заголовки неполные/не parse'ятся.
     """
+    import json as _json
+
     from ytmusicapi import setup  # lazy import — тяжёлая зависимость
 
     try:
-        return setup(headers_raw=headers_raw)
+        auth_json = setup(headers_raw=headers_raw)
     except Exception as e:
         raise ValueError(f"bad headers: {e}") from e
+    keys = {k.lower() for k in _json.loads(auth_json)}
+    missing = {"authorization", "cookie", "x-goog-authuser"} - keys
+    if missing:
+        raise ValueError(f"missing headers: {', '.join(sorted(missing))}")
+    return auth_json
 
 
 def _auth_dict(auth_json: str) -> dict:

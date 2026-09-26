@@ -45,7 +45,7 @@ python -m app.main
   - free-аккаунты получают `403` на realtime player API — бот падает назад на `recently-played` («последний трек»);
   - больше 5 пользователей — только через allowlist (User Management) или Extended Quota (только для организаций).
 - **Яндекс** — realtime через **Ynison** (нативный протокол: трек + прогресс + пауза, проверено на проде); фолбэк — очередь (`queues_list`, без прогресса). Привязка: `/yandex <токен>` (токен через официальный OAuth implicit flow, relay мёртв).
-- **YouTube Music** — нет realtime → история `get_history` через ytmusicapi (browser auth), помечаем как «последний трек». Привязка: `/youtube <заголовки>` (cookie + `x-goog-authuser` из DevTools на music.youtube.com, живут ~2 года).
+- **YouTube Music** — нет realtime → история `get_history` через ytmusicapi (browser auth), помечаем как «последний трек». Привязка: `/youtube <полные заголовки>` (Copy Request Headers из DevTools на music.youtube.com, живут ~2 года).
 - **Last.fm** — `user.getrecenttracks` по username (OAuth не нужен, Premium не нужен); трек с флагом `nowplaying` считаем играющим, иначе «последний трек». Выход для free-юзеров Spotify через скробблинг.
 
 ## CI/CD & Deploy

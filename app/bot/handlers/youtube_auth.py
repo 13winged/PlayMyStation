@@ -27,11 +27,11 @@ SETUP_HINT = (
     "1. Открой <code>music.youtube.com</code> в браузере и войди в аккаунт\n"
     "2. Открой DevTools (Ctrl+Shift+I) → вкладка Network, в фильтр введи "
     "<code>/browse</code>\n"
-    "3. Обнови страницу или нажми «Библиотека», найди POST-запрос "
-    "<code>browse?...</code>\n"
-    "4. Скопируй заголовки запроса (Firefox: правый клик → Copy → "
-    "Copy Request Headers). Достаточно двух строк: <code>cookie: ...</code> "
-    "и <code>x-goog-authuser: ...</code>\n"
+    "3. Обнови страницу (Ctrl+R), найди POST-запрос <code>browse?...</code>\n"
+    "4. Скопируй заголовки ЦЕЛИКОМ (Firefox: правый клик → Copy → "
+    "Copy Request Headers). Нужны в том числе строки "
+    "<code>authorization: SAPISIDHASH...</code>, <code>cookie: ...</code> "
+    "и <code>x-goog-authuser: ...</code> — по двум строкам не взлетит\n"
     "5. Пришли их боту одним сообщением:\n"
     "<code>/youtube &lt;заголовки&gt;</code>\n\n"
     "Заголовки хранятся в зашифрованном виде и действуют, пока жива сессия "
@@ -57,10 +57,11 @@ async def cmd_youtube(
             auth_json = await asyncio.to_thread(build_auth_json, payload)
         except ValueError:
             await message.answer(
-                "❌ Не получилось разобрать заголовки. Нужны строки "
-                "<code>cookie: ...</code> и <code>x-goog-authuser: ...</code> "
-                "из запроса <code>/browse</code> на music.youtube.com.\n\n"
-                "Подробнее — просто пришли <code>/youtube</code> без аргументов."
+                "❌ Заголовки неполные: нужны ВСЕ заголовки запроса "
+                "<code>/browse</code> целиком (включая "
+                "<code>authorization: SAPISIDHASH...</code>). "
+                "В DevTools: правый клик по запросу → Copy → "
+                "Copy Request Headers → вставь всё как есть."
             )
             return
 
