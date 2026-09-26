@@ -7,7 +7,7 @@ import pytest
 from app.services.base import BaseMusicService, TrackDTO
 from app.services.spotify import SpotifyService
 from app.services.yandex import YandexMusicService, pick_best_download_info
-from app.services.youtube import YouTubeMusicService
+from app.services.youtube import YouTubeMusicService, parse_duration_seconds, pick_match
 
 
 def _track(provider: str = "yandex", **kw) -> TrackDTO:
@@ -83,3 +83,45 @@ class TestSpotifyDownload:
     async def test_youtube_without_track_id_no_download(self) -> None:
         svc = YouTubeMusicService("{}")
         assert await svc.download_track(_track("youtube")) is None
+
+
+class TestParseDuration:
+    def test_mm_ss(self) -> None:
+        assert parse_duration_seconds("4:38") == 278
+
+    def test_hh_mm_ss(self) -> None:
+        assert parse_duration_seconds("1:02:03") == 3723
+
+    def test_seconds_number(self) -> None:
+        assert parse_duration_seconds(213) == 213
+        assert parse_duration_seconds(213.7) == 213
+
+    def test_garbage_returns_none(self) -> None:
+        assert parse_duration_seconds(None) is None
+        assert parse_duration_seconds("live") is None
+        assert parse_duration_seconds("") is None
+        assert parse_duration_seconds(0) is None
+
+
+class TestPickMatch:
+    def test_picks_closest_duration(self) -> None:
+        cands = [
+            {"videoId": "far", "duration_seconds": 300},
+            {"videoId": "near", "duration_seconds": 215},
+        ]
+        assert pick_match(cands, 213_000) == "near"
+
+    def test_outside_tolerance_returns_none(self) -> None:
+        cands = [{"videoId": "x", "duration_seconds": 300}]
+        assert pick_match(cands, 180_000) is None
+
+    def test_no_expected_returns_first(self) -> None:
+        cands = [{"videoId": "a", "duration_seconds": 999}]
+        assert pick_match(cands, None) == "a"
+
+    def test_empty_returns_none(self) -> None:
+        assert pick_match([], 180_000) is None
+
+    def test_unknown_duration_accepts_best(self) -> None:
+        cands = [{"videoId": "u", "duration_seconds": None}]
+        assert pick_match(cands, 180_000) == "u"

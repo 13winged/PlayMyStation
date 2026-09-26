@@ -14,6 +14,7 @@ from app.core.config import get_settings
 from app.core.retry import SPOTIFY_CIRCUIT, create_retry_transport
 from app.services.audio import fetch_audio_bytes
 from app.services.base import BaseMusicService, TrackDTO
+from app.services.youtube import download_by_query
 
 log = logging.getLogger("playmystation.spotify")
 
@@ -245,7 +246,19 @@ class SpotifyService(BaseMusicService):
         )
 
     async def download_track(self, track: TrackDTO) -> tuple[bytes, str] | None:
-        """У Spotify нет API полного аудио — отдаём 30-сек preview, если есть."""
+        """Полный трек через YouTube-матчинг, фолбэк — 30-сек preview.
+
+        Схема как у Spotisaver: из Spotify берём только метаданные
+        (название + исполнитель + длительность), аудио ищем на YouTube.
+        Совпадение проверяем по длительности (±7 сек), иначе лучше
+        превью, чем чужой трек с тем же названием.
+        """
+        if track.artist and track.artist != "Unknown artist":
+            full = await download_by_query(
+                f"{track.artist} - {track.title}", track.duration_ms
+            )
+            if full is not None:
+                return full
         if not track.preview_url:
             return None
         data = await fetch_audio_bytes(track.preview_url)

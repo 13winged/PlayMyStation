@@ -128,6 +128,98 @@ def _download_youtube_sync(video_id: str) -> tuple[bytes, str] | None:
     return None
 
 
+def parse_duration_seconds(value: object) -> int | None:
+    """'4:38' / '1:02:03' / секунды → секунды. None если не разобрать."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)) and value > 0:
+        return int(value)
+    if isinstance(value, str):
+        try:
+            total = 0
+            for part in value.strip().split(":"):
+                total = total * 60 + int(part)
+        except ValueError:
+            return None
+        return total or None
+    return None
+
+
+def _search_candidates_sync(query: str, limit: int = 5) -> list[dict]:
+    """Поиск песен на YouTube Music без авторизации. Синхронная."""
+    from ytmusicapi import YTMusic  # lazy import — тяжёлая зависимость
+
+    yt = YTMusic()
+    results = yt.search(query, filter="songs", limit=limit) or []
+    candidates = []
+    for r in results:
+        if not isinstance(r, dict):
+            continue
+        video_id = r.get("videoId")
+        if not video_id:
+            continue
+        duration = parse_duration_seconds(r.get("duration_seconds", r.get("duration")))
+        candidates.append(
+            {"videoId": video_id, "duration_seconds": duration, "title": r.get("title")}
+        )
+    return candidates
+
+
+def pick_match(
+    candidates: list[dict], expected_ms: int | None, tolerance_s: int = 7
+) -> str | None:
+    """Выбрать videoId по близости длительности.
+
+    Без expected — первый кандидат. Вне допуска — None (лучше превью,
+    чем чужой трек: кавер/live с тем же названием).
+    """
+    if not candidates:
+        return None
+    if not expected_ms:
+        return str(candidates[0]["videoId"])
+    expected = expected_ms / 1000
+    ranked = sorted(
+        candidates,
+        key=lambda c: abs((c.get("duration_seconds") or expected) - expected),
+    )
+    best = ranked[0]
+    best_dur = best.get("duration_seconds")
+    if best_dur is None:
+        return str(best["videoId"])
+    if abs(best_dur - expected) <= tolerance_s:
+        return str(best["videoId"])
+    log.info("no duration match for %.0fs among %d candidates", expected, len(candidates))
+    return None
+
+
+async def download_by_query(
+    query: str, duration_ms: int | None = None
+) -> tuple[bytes, str] | None:
+    """Найти трек на YouTube Music по 'Artist - Title' и скачать аудио.
+
+    Схема как у Spotisaver: метаданные → поиск совпадения → скачивание.
+    Поиск не требует авторизации.
+    """
+    try:
+        candidates = await asyncio.to_thread(_search_candidates_sync, query)
+    except Exception:  # noqa: BLE001 — best-effort
+        await YOUTUBE_CIRCUIT.record_failure()
+        return None
+    video_id = pick_match(candidates, duration_ms)
+    if not video_id:
+        return None
+    try:
+        async with asyncio.timeout(110):
+            result = await asyncio.to_thread(_download_youtube_sync, video_id)
+    except (TimeoutError, Exception):  # noqa: BLE001 — best-effort докачка
+        await YOUTUBE_CIRCUIT.record_failure()
+        return None
+    if result is None:
+        return None
+    await YOUTUBE_CIRCUIT.record_success()
+    return result
+
+
 class YouTubeMusicService(BaseMusicService):
     provider = "youtube"
 
