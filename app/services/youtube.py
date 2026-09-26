@@ -58,7 +58,8 @@ async def check_auth(auth_json: str) -> bool:
     """Проверить auth-JSON: True если запрос истории прошёл (даже пустой)."""
     try:
         await asyncio.to_thread(_fetch_history_sync, auth_json)
-    except Exception:  # noqa: BLE001 — любая ошибка = невалидная привязка
+    except Exception:
+        log.warning("YouTube auth check failed", exc_info=True)
         return False
     return True
 
