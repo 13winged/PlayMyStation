@@ -16,6 +16,7 @@ import httpx
 from app.core.config import get_settings
 from app.core.retry import LASTFM_CIRCUIT, create_retry_transport
 from app.services.base import BaseMusicService, TrackDTO
+from app.services.youtube import download_by_query
 
 API_URL = "https://ws.audioscrobbler.com/2.0/"
 
@@ -106,3 +107,13 @@ class LastFmService(BaseMusicService):
             provider="lastfm",
             preview_url=None,  # превью нет — только ссылка на трек
         )
+
+    async def download_track(self, track: TrackDTO) -> tuple[bytes, str] | None:
+        """Аудио через YouTube-матчинг по метаданным скроббла.
+
+        Длительности Last.fm не отдаёт — берём первый результат поиска.
+        Best-effort: mismatch возможен, фолбэка нет.
+        """
+        if not track.artist or track.artist == "Unknown artist":
+            return None
+        return await download_by_query(f"{track.artist} - {track.title}")

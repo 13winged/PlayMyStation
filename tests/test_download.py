@@ -10,8 +10,8 @@ from app.services.yandex import YandexMusicService, pick_best_download_info
 from app.services.youtube import YouTubeMusicService, parse_duration_seconds, pick_match
 
 
-def _track(provider: str = "yandex", **kw) -> TrackDTO:
-    return TrackDTO(title="T", artist="A", provider=provider, **kw)
+def _track(provider: str = "yandex", artist: str = "A", **kw) -> TrackDTO:
+    return TrackDTO(title="T", artist=artist, provider=provider, **kw)
 
 
 class TestBaseDownload:
@@ -83,6 +83,30 @@ class TestSpotifyDownload:
     async def test_youtube_without_track_id_no_download(self) -> None:
         svc = YouTubeMusicService("{}")
         assert await svc.download_track(_track("youtube")) is None
+
+
+class TestLastFmDownload:
+    @pytest.mark.asyncio
+    async def test_unknown_artist_no_download(self) -> None:
+        from app.services.lastfm import LastFmService
+
+        svc = LastFmService("someuser")
+        assert await svc.download_track(_track("lastfm", artist="Unknown artist")) is None
+
+    @pytest.mark.asyncio
+    async def test_delegates_to_youtube_matching(self) -> None:
+        from unittest.mock import AsyncMock, patch
+
+        from app.services.lastfm import LastFmService
+
+        svc = LastFmService("someuser")
+        with patch(
+            "app.services.lastfm.download_by_query", new_callable=AsyncMock
+        ) as mock_dl:
+            mock_dl.return_value = (b"audio", "m4a")
+            result = await svc.download_track(_track("lastfm", artist="VILLIAN"))
+            assert result == (b"audio", "m4a")
+            mock_dl.assert_awaited_once_with("VILLIAN - T")
 
 
 class TestParseDuration:

@@ -2,7 +2,7 @@
 
 После карточки трека бот фоном докачивает аудио и присылает его
 следующим сообщением (best-effort): Яндекс/YouTube — полный трек,
-Spotify — 30-сек превью, Last.fm — нечего качать.
+Spotify/Last.fm — YouTube-матчинг по метаданным (у Spotify фолбэк preview).
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ DOWNLOAD_TIMEOUT = 120.0
 
 async def _send_track_audio(message: Message, db_user: User, track: TrackDTO) -> None:
     """Фоновая докачка аудио после /now. Best-effort: тихо, без спама в чат."""
-    if track.provider not in ("yandex", "youtube", "spotify"):
+    if track.provider not in ("yandex", "youtube", "spotify", "lastfm"):
         return
     try:
         async with SessionFactory() as session:
