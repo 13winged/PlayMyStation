@@ -4,14 +4,15 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.services.audio import audio_cache_key
 from app.services.base import BaseMusicService, TrackDTO
 from app.services.spotify import SpotifyService
 from app.services.yandex import YandexMusicService, pick_best_download_info
 from app.services.youtube import YouTubeMusicService, parse_duration_seconds, pick_match
 
 
-def _track(provider: str = "yandex", artist: str = "A", **kw) -> TrackDTO:
-    return TrackDTO(title="T", artist=artist, provider=provider, **kw)
+def _track(provider: str = "yandex", artist: str = "A", title: str = "T", **kw) -> TrackDTO:
+    return TrackDTO(title=title, artist=artist, provider=provider, **kw)
 
 
 class TestBaseDownload:
@@ -149,3 +150,32 @@ class TestPickMatch:
     def test_unknown_duration_accepts_best(self) -> None:
         cands = [{"videoId": "u", "duration_seconds": None}]
         assert pick_match(cands, 180_000) == "u"
+
+
+class TestAudioCacheKey:
+    def test_exact_id_key(self) -> None:
+        t = _track("youtube", track_id="dQw4w9WgXcQ")
+        assert audio_cache_key(t) == "audio:youtube:dQw4w9WgXcQ"
+        t = _track("yandex", track_id="123")
+        assert audio_cache_key(t) == "audio:yandex:123"
+
+    def test_meta_key_stable_and_case_insensitive(self) -> None:
+        a = _track("lastfm", artist="VILLIAN", title="Track")
+        b = _track("lastfm", artist="  villian ", title="TRACK")
+        assert audio_cache_key(a) == audio_cache_key(b)
+        assert audio_cache_key(a) is not None
+        assert audio_cache_key(a).startswith("audio:lastfm:meta:")
+
+    def test_providers_separated(self) -> None:
+        a = _track("spotify", artist="A", title="T", duration_ms=180_000)
+        b = _track("lastfm", artist="A", title="T", duration_ms=180_000)
+        assert audio_cache_key(a) != audio_cache_key(b)
+
+    def test_unknown_provider_returns_none(self) -> None:
+        assert audio_cache_key(_track("unknown")) is None
+
+    def test_spotify_preview_key(self) -> None:
+        t = _track("spotify", preview_url="https://p.scdn.co/mp3-preview/abc")
+        key = audio_cache_key(t)
+        assert key is not None
+        assert key.startswith("audio:spotify:preview:")

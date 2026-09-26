@@ -17,6 +17,9 @@ log = logging.getLogger("playmystation.redis")
 # TTL для кэша now_playing (15-30 сек защита от спама /now)
 NOW_PLAYING_TTL = 20
 
+# TTL для кеша file_id скачанного аудио (повторная отдача без перекачивания)
+AUDIO_CACHE_TTL = 30 * 24 * 3600
+
 
 async def get_redis() -> redis.Redis:
     global _redis
@@ -69,3 +72,25 @@ async def invalidate_now_playing_cache(telegram_id: int) -> None:
     """Инвалидировать кэш (например, после ручного переключения трека)."""
     r = await get_redis()
     await r.delete(_now_playing_key(telegram_id))
+
+
+# ----- audio file_id cache (приватный канал как хранилище) -----
+
+
+async def get_cached_audio_file_id(cache_key: str) -> str | None:
+    """file_id ранее закачанного трека, если есть."""
+    r = await get_redis()
+    try:
+        value = await r.get(f"audio_file:{cache_key}")
+    except Exception:  # noqa: BLE001 — кэш best-effort
+        return None
+    return str(value) if value else None
+
+
+async def set_cached_audio_file_id(cache_key: str, file_id: str) -> None:
+    """Запомнить file_id трека на AUDIO_CACHE_TTL."""
+    r = await get_redis()
+    try:
+        await r.setex(f"audio_file:{cache_key}", AUDIO_CACHE_TTL, file_id)
+    except Exception:  # noqa: BLE001 — кэш best-effort
+        log.debug("Failed to cache audio file_id for %s", cache_key)

@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # Last.fm: только API-ключ сервера + username юзера (OAuth не нужен)
     lastfm_api_key: str = Field(default="", alias="LASTFM_API_KEY")
 
+    # Кеш аудио: ID приватного канала, куда бот (админ) складывает треки
+    # для повторной отдачи по file_id. 0 — кеш канала выключен.
+    audio_cache_channel_id: int = Field(default=0, alias="AUDIO_CACHE_CHANNEL_ID")
+
     # Наблюдаемость (Milestone 3): Sentry DSN + формат логов (text|json)
     sentry_dsn: str = Field(default="", alias="SENTRY_DSN")
     log_format: str = Field(default="text", alias="LOG_FORMAT")

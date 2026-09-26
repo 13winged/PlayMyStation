@@ -1,16 +1,17 @@
-"""Скачивание аудио для кнопки «⏬ Превью».
+"""Скачивание аудио для кнопки «⏬ Превью» и автодокачки в /now.
 
-Честные ограничения (ToS сервисов):
-- Spotify — только 30-секундное `preview_url` из официального API.
-- Яндекс Музыка и YouTube Music — скачивания нет, только ссылка на трек.
+Честные ограничения и решения владельца — см. README «Скачивание треков в /now».
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 
 import httpx
+
+from app.services.base import TrackDTO
 
 log = logging.getLogger("playmystation.audio")
 
@@ -29,6 +30,31 @@ def safe_filename(artist: str, title: str, ext: str = "mp3") -> str:
     if len(base) > 60:
         base = base[:60].rstrip()
     return f"{base or 'track'}.{ext}"
+
+
+def audio_cache_key(track: TrackDTO) -> str | None:
+    """Стабильный ключ трека для кеша file_id.
+
+    Приоритет точному ID (провайдер + track_id); иначе — хэш нормализованных
+    метаданных (для Spotify/Last.fm, где аудио находится матчингом:
+    один и тот же запрос даёт то же аудио).
+    """
+    if track.provider in ("youtube", "yandex", "spotify") and track.track_id:
+        return f"audio:{track.provider}:{track.track_id}"
+    if track.provider == "spotify" and track.preview_url:
+        digest = hashlib.sha256(track.preview_url.encode()).hexdigest()[:32]
+        return f"audio:spotify:preview:{digest}"
+    supported = ("spotify", "lastfm", "youtube", "yandex")
+    if track.provider in supported and track.artist and track.title:
+        parts = [
+            track.artist.strip().lower(),
+            track.title.strip().lower(),
+            str(track.duration_ms),
+        ]
+        norm = re.sub(r"\s+", " ", "|".join(parts))
+        digest = hashlib.sha256(norm.encode()).hexdigest()[:32]
+        return f"audio:{track.provider}:meta:{digest}"
+    return None
 
 
 async def fetch_audio_bytes(url: str, max_bytes: int = MAX_AUDIO_BYTES) -> bytes | None:

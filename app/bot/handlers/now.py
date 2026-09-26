@@ -10,17 +10,20 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.formatters import track_card
 from app.bot.keyboards import now_empty_kb, track_kb
+from app.core.config import get_settings
 from app.core.db import SessionFactory
+from app.core.redis import get_cached_audio_file_id, set_cached_audio_file_id
 from app.db import repositories as repo
 from app.db.models import User
-from app.services.audio import fetch_audio_bytes, safe_filename
+from app.services.audio import audio_cache_key, fetch_audio_bytes, safe_filename
 from app.services.base import TrackDTO
 from app.services.factory import build_service, resolve_now_playing
 
@@ -33,9 +36,23 @@ DOWNLOAD_TIMEOUT = 120.0
 
 
 async def _send_track_audio(message: Message, db_user: User, track: TrackDTO) -> None:
-    """Фоновая докачка аудио после /now. Best-effort: тихо, без спама в чат."""
-    if track.provider not in ("yandex", "youtube", "spotify", "lastfm"):
+    """Фоновая отдача аудио после /now. Best-effort: тихо, без спама в чат.
+
+    Порядок: кеш file_id (Redis + приватный канал) → докачка →
+    отправка юзеру + складирование в канал для следующих раз.
+    """
+    cache_key = audio_cache_key(track)
+    if cache_key is None:
         return
+    # 1) повторная отдача по file_id без перекачивания
+    file_id = await get_cached_audio_file_id(cache_key)
+    if file_id:
+        try:
+            await message.answer_audio(audio=file_id, title=track.title, performer=track.artist)
+            return
+        except TelegramAPIError:
+            log.info("stale audio file_id, re-downloading '%s'", track.title)
+    # 2) докачка
     try:
         async with SessionFactory() as session:
             integrations = await repo.list_integrations(session, db_user.id)
@@ -55,12 +72,36 @@ async def _send_track_audio(message: Message, db_user: User, track: TrackDTO) ->
             if result is None:
                 return
             data, ext = result
-            audio = BufferedInputFile(
-                data, filename=safe_filename(track.artist, track.title, ext=ext)
+            filename = safe_filename(track.artist, track.title, ext=ext)
+            await message.answer_audio(
+                BufferedInputFile(data, filename=filename),
+                title=track.title,
+                performer=track.artist,
             )
-            await message.answer_audio(audio, title=track.title, performer=track.artist)
+            # 3) складировать в канал для следующих раз
+            await _store_to_cache_channel(message.bot, cache_key, data, filename, track)
     except Exception:
         log.exception("download task crashed")
+
+
+async def _store_to_cache_channel(
+    bot: Bot, cache_key: str, data: bytes, filename: str, track: TrackDTO
+) -> None:
+    """Отправить трек в приватный канал и запомнить file_id. Best-effort."""
+    channel_id = get_settings().audio_cache_channel_id
+    if not channel_id:
+        return
+    try:
+        sent = await bot.send_audio(
+            chat_id=channel_id,
+            audio=BufferedInputFile(data, filename=filename),
+            title=track.title,
+            performer=track.artist,
+        )
+        if sent.audio is not None:
+            await set_cached_audio_file_id(cache_key, sent.audio.file_id)
+    except Exception:
+        log.info("audio cache channel store failed", exc_info=True)
 
 
 def _schedule_download(message: Message, db_user: User, track: TrackDTO) -> None:
