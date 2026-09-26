@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.redis import invalidate_now_playing_cache
 from app.db import repositories as repo
 from app.db.models import User
-from app.services.youtube import build_auth_json, check_auth
+from app.services.youtube import build_auth_json, check_auth, validate_auth_json
 
 router = Router()
 
@@ -50,12 +50,23 @@ async def cmd_youtube(
 
     # Принимаем либо готовый auth-JSON, либо сырые заголовки из браузера.
     payload = raw.strip().strip('"').strip("'")
-    if payload.startswith("{"):
-        auth_json = payload
-    else:
-        try:
+    try:
+        if payload.startswith("{"):
+            auth_json = payload
+            validate_auth_json(auth_json)
+        else:
             auth_json = await asyncio.to_thread(build_auth_json, payload)
-        except ValueError:
+    except (ValueError, TypeError) as e:
+        detail = str(e)
+        if "3PAPISID" in detail:
+            await message.answer(
+                "❌ В cookie нет признака входа в аккаунт "
+                "(__Secure-3PAPISID). Ты скопировал заголовки из "
+                "незалогиненной сессии: войди на music.youtube.com "
+                "(аватар справа вверху, не кнопка «Войти»), обнови страницу "
+                "и скопируй заголовки заново."
+            )
+        else:
             await message.answer(
                 "❌ Заголовки неполные: нужны ВСЕ заголовки запроса "
                 "<code>/browse</code> целиком (включая "
@@ -63,7 +74,7 @@ async def cmd_youtube(
                 "В DevTools: правый клик по запросу → Copy → "
                 "Copy Request Headers → вставь всё как есть."
             )
-            return
+        return
 
     valid = await check_auth(auth_json)
     if not valid:

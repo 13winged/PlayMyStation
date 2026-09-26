@@ -4,11 +4,12 @@
 поэтому берём последний трек из истории (`get_history`)
 и помечаем is_playing=False — честный UX «последний трек», как у Last.fm.
 
-Привязка: `/youtube <заголовки из браузера>` (browser auth по документации
+Привязка: `/youtube <полные заголовки из браузера>` (browser auth по документации
 ytmusicapi: music.youtube.com → DevTools → Network → фильтр `/browse` →
-copy request headers). Достаточно строк `cookie:` и `x-goog-authuser:`.
-В БД храним готовый auth-JSON (вывод `ytmusicapi.setup`) в зашифрованном
-виде. Живёт ~2 года, пока жива сессия в браузере.
+Copy Request Headers). Нужны в том числе `authorization: SAPISIDHASH...`,
+`cookie:` (с `__Secure-3PAPISID` — признак входа в аккаунт) и
+`x-goog-authuser:`. В БД храним готовый auth-JSON (вывод `ytmusicapi.setup`)
+в зашифрованном виде. Живёт ~2 года, пока жива сессия в браузере.
 
 Sync-библиотека ytmusicapi выполняется в asyncio.to_thread.
 """
@@ -24,27 +25,46 @@ from app.services.base import BaseMusicService, TrackDTO
 
 log = logging.getLogger("playmystation.youtube")
 
+REQUIRED_HEADER_KEYS = frozenset({"authorization", "cookie", "x-goog-authuser"})
+
+
+def validate_auth_json(auth_json: str) -> None:
+    """Проверить готовый auth-JSON до сохранения.
+
+    Бросает ValueError с человекочитаемой причиной:
+    - не JSON / нет нужных заголовков;
+    - в cookie нет `__Secure-3PAPISID` — заголовки скопированы
+      из незалогиненной (гостевой) сессии, история не откроется.
+    """
+    try:
+        data = json.loads(auth_json)
+    except (json.JSONDecodeError, TypeError) as e:
+        raise ValueError("not JSON") from e
+    if not isinstance(data, dict):
+        raise TypeError("not JSON")
+    lowered = {str(k).lower(): v for k, v in data.items()}
+    missing = sorted(REQUIRED_HEADER_KEYS - set(lowered))
+    if missing:
+        raise ValueError(f"missing headers: {', '.join(missing)}")
+    cookie = str(lowered.get("cookie") or "")
+    if "__Secure-3PAPISID" not in cookie:
+        raise ValueError("not logged in: no __Secure-3PAPISID in cookie")
+
 
 def build_auth_json(headers_raw: str) -> str:
     """Превратить скопированные заголовки браузера в auth-JSON.
 
-    Синхронная: вызывает `ytmusicapi.setup(headers_raw=...)`.
-    Нужны ПОЛНЫЕ заголовки запроса /browse (включая `authorization: SAPISIDHASH...`,
-    `cookie:` и `x-goog-authuser:`) — иначе YTMusic не признает browser-auth.
-    Бросает ValueError, если заголовки неполные/не parse'ятся.
+    Синхронная: вызывает `ytmusicapi.setup(headers_raw=...)`, затем
+    валидирует результат через `validate_auth_json`.
+    Бросает ValueError, если заголовки неполные/гостевые.
     """
-    import json as _json
-
     from ytmusicapi import setup  # lazy import — тяжёлая зависимость
 
     try:
         auth_json = setup(headers_raw=headers_raw)
     except Exception as e:
         raise ValueError(f"bad headers: {e}") from e
-    keys = {k.lower() for k in _json.loads(auth_json)}
-    missing = {"authorization", "cookie", "x-goog-authuser"} - keys
-    if missing:
-        raise ValueError(f"missing headers: {', '.join(sorted(missing))}")
+    validate_auth_json(auth_json)
     return auth_json
 
 
