@@ -107,7 +107,7 @@ class TestLastFmDownload:
             mock_dl.return_value = (b"audio", "m4a")
             result = await svc.download_track(_track("lastfm", artist="VILLIAN"))
             assert result == (b"audio", "m4a")
-            mock_dl.assert_awaited_once_with("VILLIAN - T")
+            mock_dl.assert_awaited_once_with("VILLIAN - T", None, None)
 
 
 class TestParseDuration:

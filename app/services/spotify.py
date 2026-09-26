@@ -245,7 +245,9 @@ class SpotifyService(BaseMusicService):
             preview_url=item.get("preview_url"),
         )
 
-    async def download_track(self, track: TrackDTO) -> tuple[bytes, str] | None:
+    async def download_track(
+        self, track: TrackDTO, cookie_json: str | None = None
+    ) -> tuple[bytes, str] | None:
         """Полный трек через YouTube-матчинг, фолбэк — 30-сек preview.
 
         Схема как у Spotisaver: из Spotify берём только метаданные
@@ -255,7 +257,7 @@ class SpotifyService(BaseMusicService):
         """
         if track.artist and track.artist != "Unknown artist":
             full = await download_by_query(
-                f"{track.artist} - {track.title}", track.duration_ms
+                f"{track.artist} - {track.title}", track.duration_ms, cookie_json
             )
             if full is not None:
                 return full

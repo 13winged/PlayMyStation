@@ -108,7 +108,9 @@ class LastFmService(BaseMusicService):
             preview_url=None,  # превью нет — только ссылка на трек
         )
 
-    async def download_track(self, track: TrackDTO) -> tuple[bytes, str] | None:
+    async def download_track(
+        self, track: TrackDTO, cookie_json: str | None = None
+    ) -> tuple[bytes, str] | None:
         """Аудио через YouTube-матчинг по метаданным скроббла.
 
         Длительности Last.fm не отдаёт — берём первый результат поиска.
@@ -116,4 +118,4 @@ class LastFmService(BaseMusicService):
         """
         if not track.artist or track.artist == "Unknown artist":
             return None
-        return await download_by_query(f"{track.artist} - {track.title}")
+        return await download_by_query(f"{track.artist} - {track.title}", None, cookie_json)

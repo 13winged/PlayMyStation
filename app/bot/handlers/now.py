@@ -62,9 +62,17 @@ async def _send_track_audio(message: Message, db_user: User, track: TrackDTO) ->
             svc = await build_service(integ, session)
             if svc is None:
                 return
+            # Матчинг Spotify/Last.fm качает с YouTube: подкладываем куки
+            # из YouTube-привязки юзера, иначе бан серверного IP.
+            cookie_json = None
+            if track.provider in ("spotify", "lastfm"):
+                yt_integ = next((i for i in integrations if i.provider == "youtube"), None)
+                if yt_integ is not None:
+                    cookie_json = repo.decrypted_access(yt_integ)
             try:
                 result = await asyncio.wait_for(
-                    svc.download_track(track), timeout=DOWNLOAD_TIMEOUT
+                    svc.download_track(track, cookie_json=cookie_json),
+                    timeout=DOWNLOAD_TIMEOUT,
                 )
             except (TimeoutError, Exception):  # noqa: BLE001 — докачка не обязана успевать
                 log.info("download failed/timeout: %s '%s'", track.provider, track.title)

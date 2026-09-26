@@ -4,7 +4,11 @@ import json
 
 import pytest
 
-from app.services.youtube import validate_auth_json
+from app.services.youtube import (
+    cookie_header_to_netscape,
+    extract_cookie,
+    validate_auth_json,
+)
 
 
 def _auth_json(**overrides: object) -> str:
@@ -39,3 +43,24 @@ def test_validate_auth_json_not_json() -> None:
         validate_auth_json("cookie: blah")
     with pytest.raises(TypeError, match="not JSON"):
         validate_auth_json("[1, 2]")
+
+
+def test_extract_cookie() -> None:
+    auth = _auth_json(cookie="SID=aaa; __Secure-3PAPISID=bbb")
+    assert extract_cookie(auth) == "SID=aaa; __Secure-3PAPISID=bbb"
+    assert extract_cookie("{}") is None
+    assert extract_cookie("not json") is None
+    assert extract_cookie("[1]") is None
+
+
+def test_cookie_header_to_netscape_format() -> None:
+    out = cookie_header_to_netscape("SID=aaa; __Secure-3PAPISID=bbb; broken; =x")
+    lines = out.strip().split("\n")
+    assert lines[0] == "# Netscape HTTP Cookie File"
+    assert len(lines) == 3  # мусорные куски отброшены
+    assert lines[1].split("\t")[:3] == [".youtube.com", "TRUE", "/"]
+    assert lines[1].split("\t")[3] == "FALSE"  # SID — не Secure
+    assert lines[2].split("\t")[3] == "TRUE"  # __Secure- — Secure
+    assert lines[2].endswith("__Secure-3PAPISID\tbbb")
+    expiry = int(lines[1].split("\t")[4])
+    assert expiry > 1700000000  # осмысленный timestamp в будущем

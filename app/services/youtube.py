@@ -101,13 +101,20 @@ async def check_auth(auth_json: str) -> bool:
     return True
 
 
-def _download_youtube_sync(video_id: str) -> tuple[bytes, str] | None:
-    """Скачать аудио через yt-dlp во временную директорию. Синхронная."""
+def _download_youtube_sync(
+    video_id: str, cookie_header: str | None = None
+) -> tuple[bytes, str] | None:
+    """Скачать аудио через yt-dlp во временную директорию. Синхронная.
+
+    cookie_header — сырая строка `Cookie` из browser-auth: YouTube банит
+    датацентровые IP («Sign in to confirm you're not a bot»), с куками
+    юзера скачивание идёт от его имени и блок снимается.
+    """
     from yt_dlp import YoutubeDL  # lazy import — тяжёлая зависимость
 
     url = f"https://music.youtube.com/watch?v={video_id}"
     with tempfile.TemporaryDirectory(prefix="pms-yt-") as workdir:
-        opts = {
+        opts: dict = {
             "format": "bestaudio[ext=m4a]/bestaudio/best",
             "outtmpl": os.path.join(workdir, "%(id)s.%(ext)s"),
             "quiet": True,
@@ -115,6 +122,11 @@ def _download_youtube_sync(video_id: str) -> tuple[bytes, str] | None:
             "noplaylist": True,
             "max_filesize": MAX_TRACK_BYTES,
         }
+        if cookie_header:
+            cookie_file = os.path.join(workdir, "cookies.txt")
+            with open(cookie_file, "w", encoding="utf-8") as f:
+                f.write(cookie_header_to_netscape(cookie_header))
+            opts["cookiefile"] = cookie_file
         with YoutubeDL(opts) as ydl:
             ydl.download([url])
         for name in os.listdir(workdir):
@@ -126,6 +138,39 @@ def _download_youtube_sync(video_id: str) -> tuple[bytes, str] | None:
                     return None
                 return data, ext
     return None
+
+
+def extract_cookie(auth_json: str) -> str | None:
+    """Достать сырую Cookie-строку из сохранённого auth-JSON. None если нет."""
+    try:
+        data = json.loads(auth_json)
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    for key, value in data.items():
+        if str(key).lower() == "cookie" and isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def cookie_header_to_netscape(cookie_header: str) -> str:
+    """Cookie-строка браузера → Netscape cookie file для yt-dlp."""
+    import time as _time
+
+    expiry = int(_time.time()) + 365 * 24 * 3600
+    lines = ["# Netscape HTTP Cookie File"]
+    for part in cookie_header.split(";"):
+        part = part.strip()
+        if not part or "=" not in part:
+            continue
+        name, _, value = part.partition("=")
+        name, value = name.strip(), value.strip()
+        if not name or not value:
+            continue
+        secure = "TRUE" if name.startswith("__Secure-") else "FALSE"
+        lines.append(f".youtube.com\tTRUE\t/\t{secure}\t{expiry}\t{name}\t{value}")
+    return "\n".join(lines) + "\n"
 
 
 def parse_duration_seconds(value: object) -> int | None:
@@ -193,12 +238,13 @@ def pick_match(
 
 
 async def download_by_query(
-    query: str, duration_ms: int | None = None
+    query: str, duration_ms: int | None = None, cookie_json: str | None = None
 ) -> tuple[bytes, str] | None:
     """Найти трек на YouTube Music по 'Artist - Title' и скачать аудио.
 
     Схема как у Spotisaver: метаданные → поиск совпадения → скачивание.
-    Поиск не требует авторизации.
+    Поиск не требует авторизации; скачивание — с куками юзера
+    (cookie_json — сохранённый auth-JSON), иначе бан по IP.
     """
     try:
         candidates = await asyncio.to_thread(_search_candidates_sync, query)
@@ -208,9 +254,10 @@ async def download_by_query(
     video_id = pick_match(candidates, duration_ms)
     if not video_id:
         return None
+    cookie = extract_cookie(cookie_json) if cookie_json else None
     try:
         async with asyncio.timeout(110):
-            result = await asyncio.to_thread(_download_youtube_sync, video_id)
+            result = await asyncio.to_thread(_download_youtube_sync, video_id, cookie)
     except (TimeoutError, Exception):  # noqa: BLE001 — best-effort докачка
         await YOUTUBE_CIRCUIT.record_failure()
         return None
@@ -292,12 +339,19 @@ class YouTubeMusicService(BaseMusicService):
         )
 
     async def download_track(self, track: TrackDTO) -> tuple[bytes, str] | None:
-        """Скачать полный трек через yt-dlp (родной m4a, без конвертации)."""
+        """Скачать полный трек через yt-dlp (родной m4a, без конвертации).
+
+        Качаем с куками из собственной привязки — иначе YouTube режет
+        серверные IP («Sign in to confirm you're not a bot»).
+        """
         if not track.track_id:
             return None
+        cookie = extract_cookie(self._auth_json)
         try:
             async with asyncio.timeout(110):
-                data_ext = await asyncio.to_thread(_download_youtube_sync, track.track_id)
+                data_ext = await asyncio.to_thread(
+                    _download_youtube_sync, track.track_id, cookie
+                )
         except (TimeoutError, Exception):  # noqa: BLE001 — best-effort докачка
             await YOUTUBE_CIRCUIT.record_failure()
             return None
