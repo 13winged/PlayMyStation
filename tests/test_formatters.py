@@ -72,6 +72,21 @@ def test_track_card_yandex_not_playing() -> None:
     assert "4:00" in card
 
 
+def test_track_card_duration_without_progress() -> None:
+    """Без прогресса — только длительность, без '--:-- /'."""
+    track = TrackDTO(
+        title="T",
+        artist="A",
+        duration_ms=158_000,
+        progress_ms=None,
+        is_playing=False,
+        provider="youtube",
+    )
+    card = track_card(track)
+    assert "2:38" in card
+    assert "--:--" not in card
+
+
 def test_track_card_youtube_last_played() -> None:
     track = TrackDTO(
         title="YT Track",

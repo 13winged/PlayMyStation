@@ -66,6 +66,17 @@ def test_youtube_dto_multiple_artists_and_missing_fields() -> None:
     assert dto_empty.track_url is None
 
 
+def test_youtube_dto_filters_view_counts_from_artists() -> None:
+    """Счётчик просмотров в artists (особенность истории YT для видео) вычищается."""
+    raw = {
+        "videoId": "xyz",
+        "title": "Pretty Boy (feat. Lil Yachty)",
+        "artists": [{"name": "Joji"}, {"name": "29M views"}],
+    }
+    dto = YouTubeMusicService._to_dto(raw)
+    assert dto.artist == "Joji"
+
+
 def test_extract_code_bare() -> None:
     from app.bot.handlers.spotify_auth import extract_code_and_state
 

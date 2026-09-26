@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 
 from app.core.retry import YOUTUBE_CIRCUIT
 from app.services.base import BaseMusicService, TrackDTO
@@ -26,6 +27,10 @@ from app.services.base import BaseMusicService, TrackDTO
 log = logging.getLogger("playmystation.youtube")
 
 REQUIRED_HEADER_KEYS = frozenset({"authorization", "cookie", "x-goog-authuser"})
+
+# В истории YT для видео вторым «артистом» часто прилетает счётчик
+# просмотров ("29M views", "1,1 млн просмотров") — вычищаем.
+_VIEWS_RE = re.compile(r"view|просмотр|stream|listen", re.IGNORECASE)
 
 
 def validate_auth_json(auth_json: str) -> None:
@@ -125,7 +130,7 @@ class YouTubeMusicService(BaseMusicService):
         names = [
             a.get("name", "")
             for a in raw_artists
-            if isinstance(a, dict) and a.get("name")
+            if isinstance(a, dict) and a.get("name") and not _VIEWS_RE.search(a["name"])
         ]
         artist = ", ".join(names) or "Unknown artist"
 

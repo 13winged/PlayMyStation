@@ -53,7 +53,10 @@ def track_card(track: TrackDTO) -> str:
         lines.append(f"💿 {html.escape(track.album, quote=False)}")
     if track.duration_ms:
         bar = progress_bar(track.progress_ms, track.duration_ms)
-        time = f"{fmt_ms(track.progress_ms)} / {fmt_ms(track.duration_ms)}"
+        if track.progress_ms:
+            time = f"{fmt_ms(track.progress_ms)} / {fmt_ms(track.duration_ms)}"
+        else:
+            time = fmt_ms(track.duration_ms)  # прогресса нет — только длительность
         lines.append(f"{bar} {time}" if bar else time)
     if track.track_url:
         safe_url = html.escape(track.track_url, quote=True)
