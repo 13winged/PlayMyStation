@@ -126,9 +126,16 @@ class YandexMusicService(BaseMusicService):
             log.info("yandex download: no track_id for '%s'", track.title)
             return None
         try:
-            link, ext = await asyncio.to_thread(
-                self._direct_link_sync, track.track_id
+            # Sync-вызовы yandex-music без таймаутов — капаем снаружи,
+            # иначе зависший API вешает задачу до внешнего таймаута.
+            link, ext = await asyncio.wait_for(
+                asyncio.to_thread(self._direct_link_sync, track.track_id),
+                timeout=30,
             )
+        except TimeoutError:
+            log.warning("yandex download: direct link timed out for id=%s", track.track_id)
+            await YANDEX_CIRCUIT.record_failure()
+            return None
         except Exception:
             log.warning(
                 "yandex download: direct link failed for id=%s", track.track_id, exc_info=True
