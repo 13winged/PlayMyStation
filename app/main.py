@@ -18,6 +18,7 @@ from aiogram.fsm.storage.redis import RedisStorage
 from alembic.config import Config
 
 from alembic import command
+from app.bot.commands import setup_bot_meta
 from app.bot.handlers import lastfm_auth as lastfm_handlers
 from app.bot.handlers import now as now_handlers
 from app.bot.handlers import spotify_auth as spotify_handlers
@@ -193,6 +194,7 @@ async def main() -> None:
     # Регистрируем bot и dispatcher в web app для webhook handler
     set_webhook_bot(bot)
     set_webhook_dispatcher(dp)
+    await setup_bot_meta(bot)
 
     try:
         if settings.use_webhook:

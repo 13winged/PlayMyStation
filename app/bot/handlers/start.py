@@ -30,7 +30,8 @@ async def cmd_start(message: Message, session: AsyncSession, db_user: User) -> N
         "Выбери активный сервис или режим <b>ALL</b> — тогда /now найдёт тот, где музыка играет прямо сейчас.\n\n"
         "Команды:\n"
         "• /services — подключить / выбрать сервис\n"
-        "• /now или /np — что сейчас играет\n"
+        "• /now или /np — что сейчас играет (+ пришлю трек)\n"
+        "• /spotify /yandex /youtube /lastfm — подключить конкретный сервис\n"
         "• /disconnect <provider> — отключить сервис",
         reply_markup=services_kb(bound, active),
     )
