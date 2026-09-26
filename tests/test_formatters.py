@@ -23,7 +23,7 @@ def test_progress_bar_empty_without_times() -> None:
 def test_progress_bar_full() -> None:
     bar = progress_bar(180_000, 180_000)
     # При 100% ratio=1.0, filled=12, но HEAD всё равно добавляется
-    assert "━" in bar
+    assert "─" in bar
     assert "●" in bar  # HEAD всегда присутствует
 
 
@@ -50,10 +50,13 @@ def test_track_card_spotify() -> None:
     assert "🟢" in card
     assert "Spotify" in card
     assert "Сейчас играет" in card
-    assert "Test Song" in card
-    assert "Test Artist" in card
+    assert "<b>Test Song</b>" in card
+    assert "\nTest Artist\n" in card
     assert "Test Album" in card
-    assert "1:00 / 3:00" in card
+    assert "1:00" in card
+    assert "-2:00" in card  # остаток с минусом, как в Spotify
+    time_line = next(line for line in card.split("\n") if "1:00" in line)
+    assert " / " not in time_line  # старый разделитель ушёл
     assert "Открыть трек" in card
 
 
