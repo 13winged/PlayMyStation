@@ -17,6 +17,7 @@ from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.formatters import track_card
+from app.bot.i18n import lang_of, t
 from app.bot.keyboards import now_empty_kb, track_kb
 from app.core.config import get_settings
 from app.core.db import SessionFactory
@@ -117,13 +118,13 @@ def _schedule_download(message: Message, db_user: User, track: TrackDTO) -> None
     asyncio.create_task(_send_track_audio(message, db_user, track))
 
 
-def _schedule_platform_buttons(sent: Message, track: TrackDTO) -> None:
+def _schedule_platform_buttons(sent: Message, track: TrackDTO, lang: str) -> None:
     if not track.track_url:
         return
-    asyncio.create_task(_add_platform_buttons(sent, track))
+    asyncio.create_task(_add_platform_buttons(sent, track, lang))
 
 
-async def _add_platform_buttons(sent: Message, track: TrackDTO) -> None:
+async def _add_platform_buttons(sent: Message, track: TrackDTO, lang: str) -> None:
     """Фоном найти тот же трек на других платформах и докинуть кнопки. Best-effort."""
     try:
         links = await match_platform_links(
@@ -136,18 +137,19 @@ async def _add_platform_buttons(sent: Message, track: TrackDTO) -> None:
         return
     try:
         await sent.edit_reply_markup(
-            reply_markup=track_kb(bool(track.preview_url), links)
+            reply_markup=track_kb(bool(track.preview_url), links, lang)
         )
     except TelegramAPIError:
         log.info("songlink buttons edit failed (message gone?)")
 
 
 async def _answer_now(message: Message, session: AsyncSession, db_user: User) -> None:
+    lang = lang_of(db_user)
     integrations = await repo.list_integrations(session, db_user.id)
     if not integrations:
         await message.answer(
-            "❌ Нет привязанных сервисов.\nОткрой /services и подключи хотя бы один.",
-            reply_markup=now_empty_kb(),
+            t(lang, "now_no_services"),
+            reply_markup=now_empty_kb(lang),
         )
         return
     track = await resolve_now_playing(
@@ -155,20 +157,19 @@ async def _answer_now(message: Message, session: AsyncSession, db_user: User) ->
     )
     if track is None:
         await message.answer(
-            "⏸️ Сейчас ничего не играет (или API не вернуло трек).\n"
-            "Проверь, что музыка запущена, или смени активный сервис в /services.",
-            reply_markup=now_empty_kb(),
+            t(lang, "now_nothing"),
+            reply_markup=now_empty_kb(lang),
         )
         return
-    kb = track_kb(has_preview=bool(track.preview_url))
+    kb = track_kb(has_preview=bool(track.preview_url), lang=lang)
     if track.cover_url:
         sent = await message.answer_photo(
-            photo=track.cover_url, caption=track_card(track), reply_markup=kb
+            photo=track.cover_url, caption=track_card(track, lang), reply_markup=kb
         )
     else:
-        sent = await message.answer(track_card(track), reply_markup=kb)
+        sent = await message.answer(track_card(track, lang), reply_markup=kb)
     _schedule_download(message, db_user, track)
-    _schedule_platform_buttons(sent, track)
+    _schedule_platform_buttons(sent, track, lang)
 
 
 @router.message(Command("now", "np"))
@@ -179,26 +180,27 @@ async def cmd_now(message: Message, session: AsyncSession, db_user: User) -> Non
 @router.callback_query(F.data == "svc:now")
 async def cb_now(cb: CallbackQuery, session: AsyncSession, db_user: User) -> None:
     await cb.answer()
+    lang = lang_of(db_user)
     # Callback не имеет message.answer с тем же контекстом — шлём новое сообщение
     integrations = await repo.list_integrations(session, db_user.id)
     if not integrations:
-        await cb.message.answer("❌ Нет привязанных сервисов. Открой /services.")
+        await cb.message.answer(t(lang, "now_no_services"))
         return
     track = await resolve_now_playing(
         integrations, session, db_user.active_provider or "all", db_user.telegram_id
     )
     if track is None:
-        await cb.message.answer("⏸️ Сейчас ничего не играет.")
+        await cb.message.answer(t(lang, "now_nothing_short"))
         return
-    kb = track_kb(has_preview=bool(track.preview_url))
+    kb = track_kb(has_preview=bool(track.preview_url), lang=lang)
     if track.cover_url:
         sent = await cb.message.answer_photo(
-            photo=track.cover_url, caption=track_card(track), reply_markup=kb
+            photo=track.cover_url, caption=track_card(track, lang), reply_markup=kb
         )
     else:
-        sent = await cb.message.answer(track_card(track), reply_markup=kb)
+        sent = await cb.message.answer(track_card(track, lang), reply_markup=kb)
     _schedule_download(cb.message, db_user, track)
-    _schedule_platform_buttons(sent, track)
+    _schedule_platform_buttons(sent, track, lang)
 
 
 @router.callback_query(F.data == "dl:preview")
@@ -209,23 +211,21 @@ async def cb_preview(cb: CallbackQuery, session: AsyncSession, db_user: User) ->
     (лимит 64 байта), поэтому переиспользуем закешированный результат.
     Легальность: только официальное 30-сек preview_url Spotify.
     """
+    lang = lang_of(db_user)
     await cb.answer("⏬ Качаю превью…")
     integrations = await repo.list_integrations(session, db_user.id)
     if not integrations:
-        await cb.message.answer("❌ Нет привязанных сервисов. Открой /services.")
+        await cb.message.answer(t(lang, "now_no_services"))
         return
     track: TrackDTO | None = await resolve_now_playing(
         integrations, session, db_user.active_provider or "all", db_user.telegram_id
     )
     if track is None or not track.preview_url:
-        await cb.message.answer(
-            "ℹ️ Превью недоступно для этого трека.\n"
-            "Spotify отдаёт превью не для всех треков."
-        )
+        await cb.message.answer(t(lang, "preview_unavailable"))
         return
     data = await fetch_audio_bytes(track.preview_url)
     if not data:
-        await cb.message.answer("❌ Не получилось скачать превью. Попробуй позже.")
+        await cb.message.answer(t(lang, "preview_failed"))
         return
     audio = BufferedInputFile(data, filename=safe_filename(track.artist, track.title))
     await cb.message.answer_audio(audio, title=track.title, performer=track.artist)

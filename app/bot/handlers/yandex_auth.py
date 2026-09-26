@@ -7,6 +7,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.i18n import lang_of, t
 from app.core.redis import invalidate_now_playing_cache
 from app.db import repositories as repo
 from app.db.models import User
@@ -33,15 +34,16 @@ async def cmd_yandex(
     message: Message, command: CommandObject, session: AsyncSession, db_user: User
 ) -> None:
     token = extract_yandex_token(command.args or "")
+    lang = lang_of(db_user)
     if not token:
         integrations = await repo.list_integrations(session, db_user.id)
         if "yandex" in {i.provider for i in integrations}:
             await repo.set_active_provider(session, db_user, "yandex")
             await session.commit()
             await invalidate_now_playing_cache(db_user.telegram_id)
-            await message.answer("🔴 Активный сервис: <b>Яндекс Музыка</b>. Жми /now 🎵")
+            await message.answer(t(lang, "yx_active"))
             return
-        await message.answer("🔴 Пришли токен так:\n<code>/yandex &lt;твой_токен&gt;</code>")
+        await message.answer(t(lang, "yx_hint"))
         return
     # Быстрая проверка токена перед сохранением
     svc = YandexMusicService(token)
@@ -61,16 +63,16 @@ async def cmd_yandex(
 
     valid = await _aio.to_thread(_check)
     if not valid:
-        await message.answer("❌ Токен не подошёл. Проверь и попробуй ещё раз.")
+        await message.answer(t(lang, "yx_invalid"))
         return
 
     await repo.upsert_integration(
         session, user_id=db_user.id, provider="yandex", access_token=token
     )
     await session.commit()
-    hint = " (очередь пуста — запусти трек и проверь /now)" if probe is None else ""
+    hint = t(lang, "yx_empty_queue_hint") if probe is None else ""
     await message.answer(
-        f"✅ Яндекс Музыка подключена{hint}. Активный сервис: {db_user.active_provider}."
+        t(lang, "yx_ok", hint=hint, active=db_user.active_provider)
     )
     # Удаляем сообщение с токеном из чата по возможности (гигиена секретов)
     try:

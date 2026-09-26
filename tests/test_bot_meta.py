@@ -14,7 +14,7 @@ from app.bot.commands import (
 
 
 def test_commands_valid() -> None:
-    assert len(BOT_COMMANDS) >= 9
+    assert len(BOT_COMMANDS) >= 10
     names = [c.command for c in BOT_COMMANDS]
     assert len(set(names)) == len(names)  # без дублей
     for c in BOT_COMMANDS:
@@ -25,7 +25,7 @@ def test_commands_valid() -> None:
 def test_commands_cover_all_handlers() -> None:
     names = {c.command for c in BOT_COMMANDS}
     for expected in ("start", "services", "now", "np", "spotify", "yandex",
-                     "youtube", "lastfm", "disconnect"):
+                     "youtube", "lastfm", "lang", "disconnect"):
         assert expected in names
 
 

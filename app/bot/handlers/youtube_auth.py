@@ -1,9 +1,10 @@
 """Привязка YouTube Music через /youtube <заголовки из браузера>.
 
 Browser auth по документации ytmusicapi (без серверных OAuth-ключей):
-пользователь копирует request headers из DevTools на music.youtube.com
-(достаточно строк `cookie:` и `x-goog-authuser:`), бот превращает их
-в auth-JSON через `ytmusicapi.setup` и хранит в БД в зашифрованном виде.
+пользователь копирует request headers из DevTools на music.youtube.com,
+бот превращает их в auth-JSON через `ytmusicapi.setup` и хранит в БД
+в зашифрованном виде. Без аргументов и с привязанным сервисом —
+переключение активного режима.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.i18n import lang_of, t
 from app.core.redis import invalidate_now_playing_cache
 from app.db import repositories as repo
 from app.db.models import User
@@ -22,27 +24,12 @@ from app.services.youtube import build_auth_json, check_auth, validate_auth_json
 
 router = Router()
 
-SETUP_HINT = (
-    "▶️ <b>Подключение YouTube Music</b>\n\n"
-    "1. Открой <code>music.youtube.com</code> в браузере и войди в аккаунт\n"
-    "2. Открой DevTools (Ctrl+Shift+I) → вкладка Network, в фильтр введи "
-    "<code>/browse</code>\n"
-    "3. Обнови страницу (Ctrl+R), найди POST-запрос <code>browse?...</code>\n"
-    "4. Скопируй заголовки ЦЕЛИКОМ (Firefox: правый клик → Copy → "
-    "Copy Request Headers). Нужны в том числе строки "
-    "<code>authorization: SAPISIDHASH...</code>, <code>cookie: ...</code> "
-    "и <code>x-goog-authuser: ...</code> — по двум строкам не взлетит\n"
-    "5. Пришли их боту одним сообщением:\n"
-    "<code>/youtube &lt;заголовки&gt;</code>\n\n"
-    "Заголовки хранятся в зашифрованном виде и действуют, пока жива сессия "
-    "в браузере (обычно ~2 года)."
-)
-
 
 @router.message(Command("youtube", "ytmusic"))
 async def cmd_youtube(
     message: Message, command: CommandObject, session: AsyncSession, db_user: User
 ) -> None:
+    lang = lang_of(db_user)
     raw = (command.args or "").strip()
     if not raw:
         integrations = await repo.list_integrations(session, db_user.id)
@@ -50,9 +37,9 @@ async def cmd_youtube(
             await repo.set_active_provider(session, db_user, "youtube")
             await session.commit()
             await invalidate_now_playing_cache(db_user.telegram_id)
-            await message.answer("▶️ Активный сервис: <b>YouTube Music</b>. Жми /now 🎵")
+            await message.answer(t(lang, "yt_active"))
             return
-        await message.answer(SETUP_HINT)
+        await message.answer(t(lang, "yt_hint"))
         return
 
     # Принимаем либо готовый auth-JSON, либо сырые заголовки из браузера.
@@ -66,29 +53,14 @@ async def cmd_youtube(
     except (ValueError, TypeError) as e:
         detail = str(e)
         if "3PAPISID" in detail:
-            await message.answer(
-                "❌ В cookie нет признака входа в аккаунт "
-                "(__Secure-3PAPISID). Ты скопировал заголовки из "
-                "незалогиненной сессии: войди на music.youtube.com "
-                "(аватар справа вверху, не кнопка «Войти»), обнови страницу "
-                "и скопируй заголовки заново."
-            )
+            await message.answer(t(lang, "yt_not_logged_in"))
         else:
-            await message.answer(
-                "❌ Заголовки неполные: нужны ВСЕ заголовки запроса "
-                "<code>/browse</code> целиком (включая "
-                "<code>authorization: SAPISIDHASH...</code>). "
-                "В DevTools: правый клик по запросу → Copy → "
-                "Copy Request Headers → вставь всё как есть."
-            )
+            await message.answer(t(lang, "yt_incomplete"))
         return
 
     valid = await check_auth(auth_json)
     if not valid:
-        await message.answer(
-            "❌ Заголовки не подошли (история не открылась). "
-            "Скопируй свежие заголовки и попробуй ещё раз."
-        )
+        await message.answer(t(lang, "yt_check_failed"))
         return
 
     await repo.upsert_integration(
@@ -96,7 +68,7 @@ async def cmd_youtube(
     )
     await session.commit()
     await invalidate_now_playing_cache(db_user.telegram_id)
-    await message.answer("✅ YouTube Music подключён! Жми /now 🎵")
+    await message.answer(t(lang, "yt_ok"))
     # Удаляем сообщение с cookie из чата по возможности (гигиена секретов)
     try:
         await message.delete()

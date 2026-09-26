@@ -6,7 +6,7 @@
 ## Milestone 0 — MVP scaffold ✅
 - [x] Модели `users` + `integrations` (UniqueConstraint user+provider)
 - [x] `BaseMusicService` + `TrackDTO` (+`preview_url`) + 4 стратегии + `factory.resolve_now_playing()` + bulkhead-таймауты + circuit-breakers
-- [x] Бот: `/start /services /now /np /yandex /spotify /youtube /lastfm`, inline-статусы, выбор `active_provider/all`, кнопка «⏬ Превью», удаление секретов из чата
+- [x] Бот: `/start /services /now /np /yandex /spotify /youtube /lastfm /lang`, inline-статусы, выбор `active_provider/all`, кнопка «⏬ Превью», удаление секретов из чата
 - [x] FastAPI OAuth callback Spotify, шифрование токенов (Fernet)
 - [x] `docker-compose`: postgres + redis + app; `app/main.py` (polling + uvicorn)
 
@@ -22,7 +22,7 @@
 - [x] Обложка трека + ссылка-кнопка в карточке
 - [ ] История «последние 10 треков» (Redis list на юзера)
 - [ ] Уведомления «друг слушает»: подписки на друзей, дайджест
-- [ ] Локализация RU/EN
+- [x] Локализация RU/EN (`/lang`, язык в `users.language`, все строки в `app/bot/i18n.py`)
 
 ## Milestone 4 — По мотивам es3n1n/nowplaying (свой код, не форк)
 - [x] **Last.fm-провайдер** (`user.getrecenttracks`, только username + API key) — рабочий `/now` для free-юзеров без Premium где бы то ни было

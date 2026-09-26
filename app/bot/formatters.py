@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 
+from app.bot.i18n import t
 from app.services.base import TrackDTO
 
 PROVIDER_ICON = {"spotify": "🟢", "yandex": "🔴", "youtube": "▶️", "lastfm": "🟪"}
@@ -30,7 +31,7 @@ def fmt_ms(ms: int | None) -> str:
     return f"{s // 60}:{s % 60:02d}"
 
 
-def track_card(track: TrackDTO) -> str:
+def track_card(track: TrackDTO, lang: str = "ru") -> str:
     """Карточка трека в духе Spotify-плеера.
 
     Шапка с провайдером (мультиаккаунтинг), жирный тайтл, plain-артист,
@@ -40,14 +41,14 @@ def track_card(track: TrackDTO) -> str:
     icon = PROVIDER_ICON.get(track.provider, "🎵")
     provider_name = html.escape(
         {
-            "spotify": "Spotify",
-            "yandex": "Яндекс Музыка",
-            "youtube": "YouTube Music",
-            "lastfm": "Last.fm",
+            "spotify": t(lang, "provider_spotify"),
+            "yandex": t(lang, "provider_yandex"),
+            "youtube": t(lang, "provider_youtube"),
+            "lastfm": t(lang, "provider_lastfm"),
         }.get(track.provider, track.provider),
         quote=False,
     )
-    status = "▶️ Сейчас играет" if track.is_playing else "⏸️ Последний трек"
+    status = t(lang, "card_playing") if track.is_playing else t(lang, "card_paused")
     title = html.escape(track.title, quote=False)
     artist = html.escape(track.artist, quote=False)
     lines = [
@@ -67,7 +68,7 @@ def track_card(track: TrackDTO) -> str:
         lines.append(time)
     if track.track_url:
         safe_url = html.escape(track.track_url, quote=True)
-        lines.append(f'🔗 <a href="{safe_url}">Открыть трек</a>')
+        lines.append(f'🔗 <a href="{safe_url}">{t(lang, "card_open_track")}</a>')
     elif track.provider == "youtube" and not track.is_playing:
-        lines.append("ℹ️ YouTube Music не отдаёт realtime-статус — показан последний трек из истории.")
+        lines.append(t(lang, "card_yt_note"))
     return "\n".join(lines)

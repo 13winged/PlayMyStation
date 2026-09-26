@@ -35,6 +35,14 @@ async def set_active_provider(session: AsyncSession, user: User, provider: str) 
     return user
 
 
+async def set_language(session: AsyncSession, user: User, language: str) -> User:
+    if language not in ("ru", "en"):
+        raise ValueError(f"Unknown language: {language}")
+    user.language = language
+    await session.flush()
+    return user
+
+
 # ---------- Integrations ----------
 async def upsert_integration(
     session: AsyncSession,

@@ -14,6 +14,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.i18n import lang_of, t
 from app.core.config import get_settings
 from app.core.redis import invalidate_now_playing_cache
 from app.db import repositories as repo
@@ -27,24 +28,21 @@ async def cmd_lastfm(
     message: Message, command: CommandObject, session: AsyncSession, db_user: User
 ) -> None:
     username = (command.args or "").strip().strip('"').strip("'").split()[0] if command.args else ""
+    lang = lang_of(db_user)
     if not username:
         integrations = await repo.list_integrations(session, db_user.id)
         if "lastfm" in {i.provider for i in integrations}:
             await repo.set_active_provider(session, db_user, "lastfm")
             await session.commit()
             await invalidate_now_playing_cache(db_user.telegram_id)
-            await message.answer("🟪 Активный сервис: <b>Last.fm</b>. Жми /now 🎵")
+            await message.answer(t(lang, "lfm_active"))
             return
-        await message.answer(
-            "🟪 Пришли username так:\n<code>/lastfm &lt;твой_lastfm_username&gt;</code>\n\n"
-            "Где взять: Paper Planes → Last.fm → Settings → профиль. "
-            "Плюс свяжи Spotify → Last.fm (скробблинг), чтобы бот видел треки."
-        )
+        await message.answer(t(lang, "lfm_hint"))
         return
 
     settings = get_settings()
     if not settings.lastfm_api_key:
-        await message.answer("❌ Last.fm API-ключ не настроен на сервере (.env).")
+        await message.answer(t(lang, "lfm_no_key"))
         return
 
     # Проверяем, что юзер существует (user.getrecenttracks вернёт error=6 если нет)
@@ -61,12 +59,11 @@ async def cmd_lastfm(
                 },
             )
         except (httpx.TimeoutException, httpx.NetworkError, httpx.ProtocolError):
-            await message.answer("❌ Last.fm не отвечает. Попробуй позже.")
+            await message.answer(t(lang, "lfm_no_network"))
             return
     if resp.status_code != 200 or "error" in resp.json():
         await message.answer(
-            f"❌ Пользователь <code>{html.escape(username, quote=False)}</code> "
-            "не найден на Last.fm. Проверь username."
+            t(lang, "lfm_not_found", username=html.escape(username, quote=False))
         )
         return
 
@@ -77,5 +74,5 @@ async def cmd_lastfm(
     await session.commit()
     await invalidate_now_playing_cache(db_user.telegram_id)
     await message.answer(
-        f"✅ Last.fm подключён (<code>{html.escape(username, quote=False)}</code>). Жми /now 🎵"
+        t(lang, "lfm_ok", username=html.escape(username, quote=False))
     )

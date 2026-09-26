@@ -5,6 +5,7 @@
 пользователь копирует `code` из адресной строки после редиректа Spotify
 и присылает его боту — обмен code→token делает сервер (исходящий HTTPS).
 Код одноразовый и живёт ~10 минут.
+Без аргументов и с привязанным сервисом — переключение активного режима.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.i18n import lang_of, t
 from app.core.config import get_settings
 from app.core.redis import invalidate_now_playing_cache
 from app.db import repositories as repo
@@ -50,6 +52,7 @@ def extract_code_and_state(raw_args: str) -> tuple[str, str | None]:
 async def cmd_spotify(
     message: Message, command: CommandObject, session: AsyncSession, db_user: User
 ) -> None:
+    lang = lang_of(db_user)
     raw_args = (command.args or "").strip()
     if not raw_args:
         integrations = await repo.list_integrations(session, db_user.id)
@@ -57,34 +60,24 @@ async def cmd_spotify(
             await repo.set_active_provider(session, db_user, "spotify")
             await session.commit()
             await invalidate_now_playing_cache(db_user.telegram_id)
-            await message.answer("🟢 Активный сервис: <b>Spotify</b>. Жми /now 🎵")
+            await message.answer(t(lang, "sp_active"))
             return
-        await message.answer(
-            "🟢 Пришли код так:\n<code>/spotify &lt;код_из_адресной_строки&gt;</code>\n\n"
-            "Где взять код:\n"
-            "1. Нажми ➕ Spotify в /services и подтверди доступ\n"
-            "2. Браузер перейдёт на страницу колбэка (она может не открыться — это ОК)\n"
-            "3. Скопируй значение параметра <code>code=...</code> из адресной строки\n"
-            "4. Пришли его этой командой (код одноразовый, живёт ~10 минут)"
-        )
+        await message.answer(t(lang, "sp_hint"))
         return
     # Пользователь может вставить: голый код, код с хвостом &state=...,
     # или целую callback-ссылку — извлекаем чистое значение code.
     code, state = extract_code_and_state(raw_args)
     if not code:
-        await message.answer("❌ Не нашёл код. Пришли <code>/spotify &lt;код&gt;</code>.")
+        await message.answer(t(lang, "sp_no_code"))
         return
     # Если прислали и state — сверяем, что код выдан именно этому юзеру.
     if state is not None and state != str(db_user.telegram_id):
-        await message.answer(
-            "❌ Этот код выдан для другого Telegram-аккаунта "
-            f"(state={state}).\nПройди авторизацию заново с этого аккаунта."
-        )
+        await message.answer(t(lang, "sp_wrong_state", state=state))
         return
 
     settings = get_settings()
     if not settings.spotify_client_id or not settings.spotify_client_secret:
-        await message.answer("❌ Spotify OAuth не настроен на сервере (.env).")
+        await message.answer(t(lang, "sp_no_oauth"))
         return
 
     async with httpx.AsyncClient(timeout=15) as client:
@@ -108,13 +101,7 @@ async def cmd_spotify(
             err_desc = resp.text
         log.warning("Spotify token exchange failed: %s %s", resp.status_code, resp.text)
         safe_desc = html.escape(err_desc[:300], quote=False)
-        await message.answer(
-            "❌ Spotify отклонил код.\n"
-            f"Причина: <code>{safe_desc}</code>\n\n"
-            "Чаще всего это несовпадение redirect_uri: в обмене должен быть "
-            "точно тот же URI, что в ссылке авторизации. Проверь "
-            "SPOTIFY_REDIRECT_URI в настройках сервера."
-        )
+        await message.answer(t(lang, "sp_rejected", reason=safe_desc))
         return
 
     data = resp.json()
@@ -129,7 +116,7 @@ async def cmd_spotify(
     )
     await session.commit()
     await invalidate_now_playing_cache(db_user.telegram_id)
-    await message.answer("✅ Spotify подключён! Жми /now 🎵")
+    await message.answer(t(lang, "sp_ok"))
     # Удаляем сообщение с кодом из чата (гигиена секретов)
     try:
         await message.delete()

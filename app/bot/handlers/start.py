@@ -7,6 +7,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.i18n import lang_of, t
 from app.bot.keyboards import connect_kb, services_kb
 from app.core.redis import invalidate_now_playing_cache
 from app.db import repositories as repo
@@ -22,29 +23,23 @@ def _bound_and_active(user: User, integrations: list) -> tuple[set[str], str]:
 
 @router.message(Command("start"))
 async def cmd_start(message: Message, session: AsyncSession, db_user: User) -> None:
+    lang = lang_of(db_user)
     integrations = await repo.list_integrations(session, db_user.id)
     bound, active = _bound_and_active(db_user, integrations)
     await message.answer(
-        "👋 <b>PlayMyStation</b>\n\n"
-        "Подключи до 4 аккаунтов: Spotify, Яндекс Музыку, YouTube Music и Last.fm.\n"
-        "Выбери активный сервис или режим <b>ALL</b> — тогда /now найдёт тот, где музыка играет прямо сейчас.\n\n"
-        "Команды:\n"
-        "• /services — подключить / выбрать сервис\n"
-        "• /now или /np — что сейчас играет (+ пришлю трек)\n"
-        "• /spotify /yandex /youtube /lastfm — выбрать сервис (или подключить)\n"
-        "• /disconnect <provider> — отключить сервис",
-        reply_markup=services_kb(bound, active),
+        t(lang, "start_text"),
+        reply_markup=services_kb(bound, active, lang),
     )
 
 
 @router.message(Command("services"))
 async def cmd_services(message: Message, session: AsyncSession, db_user: User) -> None:
+    lang = lang_of(db_user)
     integrations = await repo.list_integrations(session, db_user.id)
     bound, active = _bound_and_active(db_user, integrations)
     await message.answer(
-        "⚙️ <b>Мои сервисы</b>\nНажми на сервис, чтобы подключить / отключить. "
-        "Второй ряд — выбор активного для /now.",
-        reply_markup=services_kb(bound, active),
+        t(lang, "services_text"),
+        reply_markup=services_kb(bound, active, lang),
     )
 
 
@@ -53,13 +48,14 @@ async def cmd_disconnect(
     message: Message, command: CommandObject, session: AsyncSession, db_user: User
 ) -> None:
     """Отключить сервис: /disconnect spotify|yandex|youtube|lastfm"""
+    lang = lang_of(db_user)
     provider = (command.args or "").strip().lower()
     valid_providers = ("spotify", "yandex", "youtube", "lastfm")
 
     if provider not in valid_providers:
         await message.answer(
-            f"❌ Укажи провайдера: <code>/disconnect {valid_providers[0]}</code>\n"
-            f"Доступные: {', '.join(valid_providers)}"
+            t(lang, "disconnect_usage",
+              example=valid_providers[0], available=", ".join(valid_providers))
         )
         return
 
@@ -67,7 +63,7 @@ async def cmd_disconnect(
     bound = {i.provider for i in integrations}
 
     if provider not in bound:
-        await message.answer(f"ℹ️ {provider.capitalize()} не был подключен.")
+        await message.answer(t(lang, "disconnect_not_bound", provider=provider.capitalize()))
         return
 
     await repo.delete_integration(session, db_user.id, provider)
@@ -84,36 +80,43 @@ async def cmd_disconnect(
     integrations = await repo.list_integrations(session, db_user.id)
     bound, active = _bound_and_active(db_user, integrations)
     await message.answer(
-        f"✅ {provider.capitalize()} отключён.",
-        reply_markup=services_kb(bound, active),
+        t(lang, "disconnect_done", provider=provider.capitalize()),
+        reply_markup=services_kb(bound, active, lang),
     )
 
 
 @router.callback_query(F.data == "svc:back")
 async def cb_back(cb: CallbackQuery, session: AsyncSession, db_user: User) -> None:
+    lang = lang_of(db_user)
     integrations = await repo.list_integrations(session, db_user.id)
     bound, active = _bound_and_active(db_user, integrations)
     # Сообщение может быть с фото (caption) или текстовым (text)
     if cb.message.photo:
-        await cb.message.edit_caption("⚙️ <b>Мои сервисы</b>", reply_markup=services_kb(bound, active))
+        await cb.message.edit_caption(
+            t(lang, "services_title"), reply_markup=services_kb(bound, active, lang)
+        )
     else:
-        await cb.message.edit_text("⚙️ <b>Мои сервисы</b>", reply_markup=services_kb(bound, active))
+        await cb.message.edit_text(
+            t(lang, "services_title"), reply_markup=services_kb(bound, active, lang)
+        )
     await cb.answer()
 
 
 @router.callback_query(F.data.startswith("svc:active:"))
 async def cb_set_active(cb: CallbackQuery, session: AsyncSession, db_user: User) -> None:
+    lang = lang_of(db_user)
     provider = (cb.data or "").split(":")[-1]
     await repo.set_active_provider(session, db_user, provider)
     await session.commit()
     integrations = await repo.list_integrations(session, db_user.id)
     bound, _ = _bound_and_active(db_user, integrations)
-    await cb.message.edit_reply_markup(reply_markup=services_kb(bound, provider))
-    await cb.answer(f"Активный сервис: {provider.upper()}")
+    await cb.message.edit_reply_markup(reply_markup=services_kb(bound, provider, lang))
+    await cb.answer(t(lang, "set_active_answer", provider=provider.upper()))
 
 
 @router.callback_query(F.data.startswith("svc:toggle:"))
 async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> None:
+    lang = lang_of(db_user)
     provider = (cb.data or "").split(":")[-1]
     integrations = await repo.list_integrations(session, db_user.id)
     bound = {i.provider for i in integrations}
@@ -131,10 +134,10 @@ async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> 
         # Инвалидируем кэш
         await invalidate_now_playing_cache(cb.from_user.id)
 
-        await cb.answer(f"{provider} отключён")
+        await cb.answer(t(lang, "toggle_off_answer", provider=provider))
         integrations = await repo.list_integrations(session, db_user.id)
         bound, active = _bound_and_active(db_user, integrations)
-        await cb.message.edit_reply_markup(reply_markup=services_kb(bound, active))
+        await cb.message.edit_reply_markup(reply_markup=services_kb(bound, active, lang))
         return
 
     # Подключаем - используем edit_caption для фото, edit_text для текста
@@ -146,41 +149,13 @@ async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> 
     if provider == "spotify":
         url = sp_auth_url(state=str(cb.from_user.id))
         await _edit_msg(
-            "🟢 <b>Подключение Spotify</b>\nНажми кнопку и подтверди доступ.\n\n"
-            "Если страница колбэка не откроется — скопируй параметр "
-            "<code>code=...</code> из адресной строки и пришли командой "
-            "<code>/spotify <код></code>.",
-            connect_kb(provider, url),
+            t(lang, "sp_connect"),
+            connect_kb(provider, url, lang),
         )
     elif provider == "youtube":
-        await _edit_msg(
-            "▶️ <b>Подключение YouTube Music</b>\n\n"
-            "1. Открой <code>music.youtube.com</code> в браузере и войди в аккаунт\n"
-            "2. Открой DevTools (Ctrl+Shift+I) → Network, в фильтр введи "
-            "<code>/browse</code>\n"
-            "3. Обнови страницу, найди POST-запрос <code>browse?...</code> и скопируй "
-            "заголовки ЦЕЛИКОМ (включая <code>authorization:</code>, "
-            "<code>cookie:</code> и <code>x-goog-authuser:</code>)\n"
-            "4. Пришли их боту командой:\n"
-            "<code>/youtube &lt;заголовки&gt;</code>"
-        )
+        await _edit_msg(t(lang, "yt_connect"))
     elif provider == "yandex":
-        await _edit_msg(
-            "🔴 <b>Подключение Яндекс Музыки</b>\n\n"
-            "1. Открой ссылку и войди в свой Яндекс ID:\n"
-            "<code>https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d</code>\n"
-            "2. После входа тебя вернёт на music.yandex.ru — скопируй "
-            "значение <code>access_token=...</code> из адресной строки\n"
-            "3. Пришли его боту командой:\n"
-            "<code>/yandex <токен></code>\n\n"
-            "Токен хранится в зашифрованном виде и используется только для чтения очереди."
-        )
+        await _edit_msg(t(lang, "yx_connect"))
     elif provider == "lastfm":
-        await _edit_msg(
-            "🟪 <b>Подключение Last.fm</b>\n\n"
-            "OAuth не нужен — просто пришли свой username:\n"
-            "<code>/lastfm <username></code>\n\n"
-            "Чтобы бот видел треки из Spotify, свяжи Spotify → Last.fm "
-            "(скробблинг) в настройках Last.fm. Работает и на free-аккаунтах."
-        )
+        await _edit_msg(t(lang, "lfm_connect"))
     await cb.answer()

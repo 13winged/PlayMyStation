@@ -77,6 +77,19 @@ class TestUserRepository:
         with pytest.raises(ValueError):
             await repo.set_active_provider(session, user, "invalid")
 
+    @pytest.mark.asyncio
+    async def test_set_language(self, session: AsyncSession) -> None:
+        user = await repo.get_or_create_user(session, 123456789)
+        assert user.language == "ru"
+        updated = await repo.set_language(session, user, "en")
+        assert updated.language == "en"
+
+    @pytest.mark.asyncio
+    async def test_set_language_invalid_raises(self, session: AsyncSession) -> None:
+        user = await repo.get_or_create_user(session, 123456789)
+        with pytest.raises(ValueError):
+            await repo.set_language(session, user, "de")
+
 
 class TestIntegrationRepository:
     """Тесты репозитория интеграций."""
