@@ -4,17 +4,26 @@
 поэтому берём последний трек из /me/play-history (или /me/activities)
 и помечаем is_playing=False c пометкой 'last played'.
 Если в будущем появится realtime endpoint — заменить только этот класс.
+
+Поддерживает авто-рефреш access_token через refresh_token (как Spotify).
 """
 
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
+import logging
+from collections.abc import Awaitable, Callable
 
 import httpx
 
 from app.core.config import get_settings
 from app.core.retry import SOUNDCLOUD_CIRCUIT, create_retry_transport
 from app.services.base import BaseMusicService, TrackDTO
+
+log = logging.getLogger("playmystation.soundcloud")
+
+TOKEN_URL = "https://secure.soundcloud.com/oauth/token"
 
 # Shared client with retry transport (exponential backoff, respects Retry-After)
 _soundcloud_client: httpx.AsyncClient | None = None
@@ -61,12 +70,73 @@ def build_authorize_url(state: str) -> str:
 class SoundCloudService(BaseMusicService):
     provider = "soundcloud"
 
-    def __init__(self, access_token: str) -> None:
+    def __init__(
+        self,
+        access_token: str,
+        refresh_token: str | None = None,
+        expires_at: dt.datetime | None = None,
+        on_tokens_refreshed: Callable[[str, str | None, dt.datetime | None], Awaitable[None]] | None = None,
+    ) -> None:
         self._access_token = access_token
+        self._refresh_token = refresh_token
+        self._expires_at = expires_at
+        self._on_tokens_refreshed = on_tokens_refreshed
+        self._refresh_lock = asyncio.Lock()
+
+    async def _refresh(self) -> bool:
+        if not self._refresh_token:
+            return False
+
+        async with self._refresh_lock:
+            # Double-check после получения лока
+            if not self._refresh_token:
+                return False
+
+            s = get_settings()
+            client = await _get_soundcloud_client()
+            try:
+                resp = await SOUNDCLOUD_CIRCUIT.call(
+                    client.post,
+                    TOKEN_URL,
+                    data={
+                        "grant_type": "refresh_token",
+                        "client_id": s.soundcloud_client_id,
+                        "client_secret": s.soundcloud_client_secret,
+                        "refresh_token": self._refresh_token,
+                    },
+                )
+            except httpx.HTTPStatusError as e:
+                if e.response is not None and e.response.status_code == 400:
+                    # Invalid grant - refresh token revoked/expired
+                    return False
+                raise
+
+            if resp.status_code != 200:
+                return False
+
+            data = resp.json()
+            self._access_token = data["access_token"]
+            expires_in = int(data.get("expires_in", 3600))
+            self._expires_at = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in)
+            if "refresh_token" in data:
+                self._refresh_token = data["refresh_token"]
+
+            if self._on_tokens_refreshed:
+                await self._on_tokens_refreshed(
+                    self._access_token, self._refresh_token, self._expires_at
+                )
+            return True
 
     async def get_currently_playing(self) -> TrackDTO | None:
+        # Проактивный рефреш за 60 секунд до истечения
+        if self._expires_at and self._refresh_token:
+            now = dt.datetime.now(dt.UTC)
+            if (self._expires_at - now).total_seconds() < 60:
+                await self._refresh()
+
         if SOUNDCLOUD_CIRCUIT.is_open:
             return None  # сервис недавно сыпал ошибками — не дёргаем API
+
         headers = {"Authorization": f"OAuth {self._access_token}"}
         client = await _get_soundcloud_client()
         try:
@@ -76,6 +146,8 @@ class SoundCloudService(BaseMusicService):
                 headers=headers,
                 params={"limit": 1},
             )
+            if resp.status_code == 401 and self._refresh_token and await self._refresh():
+                return await self.get_currently_playing()
             if resp.status_code == 401:
                 return None
             items: list = []
@@ -89,6 +161,8 @@ class SoundCloudService(BaseMusicService):
                     headers=headers,
                     params={"limit": 1},
                 )
+                if fav.status_code == 401 and self._refresh_token and await self._refresh():
+                    return await self.get_currently_playing()
                 if fav.status_code == 200 and isinstance(fav.json(), list) and fav.json():
                     t = fav.json()[0]
                     await SOUNDCLOUD_CIRCUIT.record_success()

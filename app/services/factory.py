@@ -73,10 +73,25 @@ async def build_service(
         return YandexMusicService(token)
 
     if integration.provider == "soundcloud":
-        token = repo.decrypted_access(integration)
-        if not token:
+        access = repo.decrypted_access(integration)
+        refresh = repo.decrypted_refresh(integration)
+        if not access:
             return None
-        return SoundCloudService(token)
+
+        async def _save(new_access: str, new_refresh: str | None, exp: dt.datetime | None) -> None:
+            await repo.upsert_integration(
+                session,
+                user_id=integration.user_id,
+                provider="soundcloud",
+                access_token=new_access,
+                refresh_token=new_refresh,
+                expires_at=exp,
+                service_user_id=integration.service_user_id,
+            )
+            await session.commit()
+
+        saver: Callable[[str, str | None, dt.datetime | None], Awaitable[None]] = _save
+        return SoundCloudService(access, refresh, integration.expires_at, on_tokens_refreshed=saver)
 
     if integration.provider == "lastfm":
         # У Last.fm нет токенов: username хранится в service_user_id.

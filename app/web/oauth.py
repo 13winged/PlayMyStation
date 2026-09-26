@@ -75,6 +75,7 @@ async def soundcloud_callback(code: str = Query(), state: str = Query()) -> dict
     if resp.status_code != 200:
         raise HTTPException(400, f"SoundCloud token exchange failed: {resp.text}")
     data = resp.json()
+    expires_at = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=int(data.get("expires_in", 3600)))
     async with SessionFactory() as session:
         res = await session.execute(select(User).where(User.telegram_id == telegram_id))
         user = res.scalar_one_or_none() or await repo.get_or_create_user(session, telegram_id)
@@ -84,6 +85,7 @@ async def soundcloud_callback(code: str = Query(), state: str = Query()) -> dict
             provider="soundcloud",
             access_token=data["access_token"],
             refresh_token=data.get("refresh_token"),
+            expires_at=expires_at,
         )
         await session.commit()
     return {

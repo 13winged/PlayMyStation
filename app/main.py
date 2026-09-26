@@ -20,6 +20,7 @@ from alembic.config import Config
 from alembic import command
 from app.bot.handlers import lastfm_auth as lastfm_handlers
 from app.bot.handlers import now as now_handlers
+from app.bot.handlers import soundcloud_auth as soundcloud_handlers
 from app.bot.handlers import spotify_auth as spotify_handlers
 from app.bot.handlers import start as start_handlers
 from app.bot.handlers import yandex_auth as yandex_handlers
@@ -80,6 +81,7 @@ def create_dispatcher() -> Dispatcher:
         now_handlers.router,
         yandex_handlers.router,
         spotify_handlers.router,
+        soundcloud_handlers.router,
         lastfm_handlers.router,
     )
     return dp
