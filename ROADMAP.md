@@ -47,7 +47,7 @@
 - Webhook отключён до **2026-09-27 00:54 UTC**: Let's Encrypt rate limit (5 сертификатов/нед — съедены перевыпусками после `down -v`). Возврат: добавить `WEBHOOK_URL`/`WEBHOOK_SECRET` в `ENV_PROD` + деплой.
 - ✅ Проверено на проде: **Last.fm** (`/now` → карточка с обложкой, `nowplaying`-статус) и **Яндекс через Ynison** (карточка с реальным прогресс-баром).
 - ⏳ Spotify ждёт Premium на аккаунте-владельце приложения (иначе `403` на все user-запросы).
-- Прод: `https://hissihyss2.com`, Caddy + авто-https, PostgreSQL + Redis + Ynison-прокси в compose.
+- Прод: собственный домен, Caddy + авто-https, PostgreSQL + Redis + Ynison-прокси в compose.
 
 ## Риски
 1. Яндекс: неофициальный API + reverse-engineered Ynison — может сломаться при изменениях у Яндекса (фолбэк на очередь остаётся); токены короткоживущие.

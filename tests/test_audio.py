@@ -100,18 +100,18 @@ def test_extract_code_with_state_tail() -> None:
     """Код с хвостом &state=... — хвост отрезается, state извлекается."""
     from app.bot.handlers.spotify_auth import extract_code_and_state
 
-    code, state = extract_code_and_state("AQAxrc3Te9e57&state=762446267")
+    code, state = extract_code_and_state("AQAxrc3Te9e57&state=123456789")
     assert code == "AQAxrc3Te9e57"
-    assert state == "762446267"
+    assert state == "123456789"
 
 
 def test_extract_code_full_url() -> None:
     from app.bot.handlers.spotify_auth import extract_code_and_state
 
-    url = "https://hissihyss2.com/oauth/spotify/callback?code=AQAxrc3&state=762446267"
+    url = "https://music.example.com/oauth/spotify/callback?code=AQAxrc3&state=123456789"
     code, state = extract_code_and_state(url)
     assert code == "AQAxrc3"
-    assert state == "762446267"
+    assert state == "123456789"
 
 
 def test_extract_yandex_token_variants() -> None:

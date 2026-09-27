@@ -29,7 +29,7 @@ def test_no_unrendered_html_entities_in_placeholders() -> None:
 def test_t_formats_and_falls_back() -> None:
     assert t("en", "sp_ok") == "✅ Spotify connected! Hit /now 🎵"
     assert t("ru", "sp_ok") == "✅ Spotify подключён! Жми /now 🎵"
-    assert "762446267" in t("en", "sp_wrong_state", state="762446267")
+    assert "123456789" in t("en", "sp_wrong_state", state="123456789")
     assert t("xx", "sp_ok") == t("ru", "sp_ok")  # неизвестный язык → RU
 
 

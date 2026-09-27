@@ -17,7 +17,7 @@ services:
     depends_on:
       - app
     environment:
-      DOMAIN: ${DOMAIN:-hissihyss2.com}
+      DOMAIN: ${DOMAIN:-music.example.com}
     ports:
       - "80:80"
       - "443:443"

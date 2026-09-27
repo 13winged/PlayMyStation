@@ -8,6 +8,7 @@
 - Кнопки под карточкой: ⏸/▶️/⏭/⏮/❤️ для Spotify, «этот же трек на …» (кросс-матчинг), «⏬ Превью», «Мои сервисы»
 - Ссылки из чата (и групп): ссылка на трек Spotify/Яндекс/YouTube → карточка + аудио
 - `/services` — подключение до 4 аккаунтов, выбор активного; команды `/spotify /yandex /youtube /lastfm` переключают режим, если сервис привязан
+- Ссылки на треки Spotify/Яндекс/YouTube прямо из чата и групп → карточка + аудио
 - `/lang` — RU/EN, `/disconnect` — отвязка
 - Метрики Prometheus (`/metrics`), пробы `/health` + `/ready`, Sentry опционально
 
@@ -33,7 +34,7 @@ pip install -e .[dev]
 python -m app.main
 ```
 
-Тесты: `python -m pytest -q` (179+), линтер: `ruff check app tests`.
+Тесты: `python -m pytest -q` (200), линтер: `ruff check app tests`.
 
 ## Провайдеры (честно)
 
@@ -51,7 +52,7 @@ python -m app.main
 - `app/services/` — стратегии провайдеров (`BaseMusicService` + `TrackDTO`), фабрика с ALL-режимом, bulkhead-таймауты, circuit breakers
 - `app/services/ynison/` + `ynison-proxy/` — realtime Яндекс Музыки (gRPC + Go-сайдкар)
 - `app/bot/` — хендлеры, клавиатуры, `track_card()`, RU/EN (`i18n.py`), доставка аудио (`delivery.py`)
-- `app/web/` — FastAPI: OAuth-callback Spotify, `/health`, `/ready`, `/metrics`, Telegram webhook
+- `app/web/` — FastAPI: OAuth-callback Spotify (CSRF-state), `/health`, `/ready`, `/metrics`, Telegram webhook (секрет обязателен)
 - `app/core/` — конфиг, БД, Redis, retry, метрики, Sentry/structlog, шифрование токенов (Fernet + ротация), audit-log
 
 ## Документы
@@ -59,6 +60,7 @@ python -m app.main
 - [README_FOR_YOUR_SERVER.md](./README_FOR_YOUR_SERVER.md) — поднятие у себя: сервер, OAuth-приложения, деплой, бэкапы, мониторинг, troubleshooting
 - [ROADMAP.md](./ROADMAP.md) — карта разработки
 - [`.env.example`](./.env.example) — все переменные с комментариями
+- [LICENSE](./LICENSE) — Apache-2.0
 
 ## Вдохновлено
 

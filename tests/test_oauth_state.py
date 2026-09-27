@@ -17,8 +17,8 @@ class TestSecureAuthorizeUrl:
         with patch(
             "app.core.redis.save_oauth_state", new_callable=AsyncMock
         ) as save:
-            url = await build_authorize_url_secure(762446267)
-        assert "state=762446267%3A" in url or "state=762446267:" in url
+            url = await build_authorize_url_secure(123456789)
+        assert "state=123456789%3A" in url or "state=123456789:" in url
         save.assert_awaited_once()
 
     def test_plain_builder_keeps_telegram_id(self) -> None:
@@ -29,9 +29,9 @@ class TestVerifyState:
     @pytest.mark.asyncio
     async def test_valid_token(self) -> None:
         with patch(
-            "app.core.redis.consume_oauth_state", new_callable=AsyncMock, return_value=762446267
+            "app.core.redis.consume_oauth_state", new_callable=AsyncMock, return_value=123456789
         ):
-            assert await _verify_state("762446267:tok123") == 762446267
+            assert await _verify_state("123456789:tok123") == 123456789
 
     @pytest.mark.asyncio
     async def test_unknown_token_rejected(self) -> None:
@@ -41,7 +41,7 @@ class TestVerifyState:
             ),
             pytest.raises(HTTPException),
         ):
-            await _verify_state("762446267:tok123")
+            await _verify_state("123456789:tok123")
 
     @pytest.mark.asyncio
     async def test_mismatched_id_rejected(self) -> None:
@@ -51,11 +51,11 @@ class TestVerifyState:
             ),
             pytest.raises(HTTPException),
         ):
-            await _verify_state("762446267:tok123")
+            await _verify_state("123456789:tok123")
 
     @pytest.mark.asyncio
     async def test_legacy_plain_id_accepted(self) -> None:
-        assert await _verify_state("762446267") == 762446267
+        assert await _verify_state("123456789") == 123456789
 
     @pytest.mark.asyncio
     async def test_garbage_rejected(self) -> None:
