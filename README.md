@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎵 PlayMyStation @playmystation_bot
+# 🎵 PlayMyStation 
 
 **One `/now` for all your music — Spotify, Yandex Music, YouTube Music and Last.fm in a single Telegram bot.**
 
@@ -11,6 +11,8 @@
 [![Ruff](https://img.shields.io/badge/ruff-checked-ef3939?style=flat-square)](./pyproject.toml)
 
 > 🇷🇺 Русская версия: [README_RU.md](./README_RU.md)
+
+> https://t.me/playmystation_bot
 
 </div>
 
