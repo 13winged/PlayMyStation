@@ -33,10 +33,27 @@ def _parse_keys(raw: str) -> list[Fernet]:
     return out
 
 
+def _primary() -> Fernet:
+    """Primary-ключ для шифрования. Падает с понятной ошибкой, а не пишет plaintext."""
+    settings = get_settings()
+    keys = _parse_keys(settings.fernet_key)
+    if not keys or settings.fernet_key.strip() == "CHANGE_ME":
+        raise RuntimeError(
+            "FERNET_KEY must be a valid 44-byte URL-safe base64 key "
+            "(generate: python -c \"from cryptography.fernet import Fernet; "
+            "print(Fernet.generate_key().decode())\")"
+        )
+    return keys[0]
+
+
 def _get_fernets() -> list[Fernet]:
     """Стек ключей: [0] — primary для шифрования, остальные — только чтение."""
     settings = get_settings()
-    return _parse_keys(settings.fernet_key) + _parse_keys(settings.fernet_keys_old)
+    try:
+        primary = [_primary()]
+    except RuntimeError:
+        primary = []
+    return primary + _parse_keys(settings.fernet_keys_old)
 
 
 def encrypt_token(raw: str | None) -> str | None:
@@ -86,7 +103,7 @@ async def reencrypt_all() -> tuple[int, int]:
     fernets = _get_fernets()
     if not fernets:
         raise ValueError("No valid FERNET_KEY — refusing to re-encrypt")
-    primary = fernets[0]
+    primary = _primary()  # упадёт здесь же, если primary невалиден
     total = rotated = 0
     async with SessionFactory() as session:
         rows = list((await session.execute(select(Integration))).scalars().all())

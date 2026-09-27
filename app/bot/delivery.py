@@ -28,6 +28,9 @@ log = logging.getLogger("playmystation.delivery")
 # Докачка идёт вне bulkhead-таймаута /now: YT-трек может качаться минуту+.
 DOWNLOAD_TIMEOUT = 120.0
 
+# Параллельных докачек всего: 45МБ-треки в памяти, бережём RAM/CPU.
+DOWNLOAD_SEMAPHORE = asyncio.Semaphore(3)
+
 
 def anonymous_service(provider: str, youtube_auth: str | None = None) -> BaseMusicService | None:
     """Сервис для треков по ссылке без привязки провайдера.
@@ -71,10 +74,11 @@ async def download_for_track(
     if svc is None:
         return None
     try:
-        return await asyncio.wait_for(
-            svc.download_track(track, youtube_auth=youtube_auth),
-            timeout=DOWNLOAD_TIMEOUT,
-        )
+        async with DOWNLOAD_SEMAPHORE:
+            return await asyncio.wait_for(
+                svc.download_track(track, youtube_auth=youtube_auth),
+                timeout=DOWNLOAD_TIMEOUT,
+            )
     except YouTubeAuthExpired:
         raise
     except (TimeoutError, Exception):  # noqa: BLE001 — докачка не обязана успевать

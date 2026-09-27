@@ -119,7 +119,7 @@ async def log_audit(
         telegram_id=telegram_id,
         action=action,
         provider=provider,
-        detail=detail,
+        detail=detail[:128] if detail else None,  # колонка varchar(128) — режем, не роняем
     )
     session.add(row)
     await session.flush()

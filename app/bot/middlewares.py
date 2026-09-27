@@ -31,8 +31,14 @@ class DbSessionMiddleware(BaseMiddleware):
     ) -> Any:
         async with self._factory() as session:
             data["session"] = session
-            result = await handler(event, data)
-            # коммит на усмотрение хэндлеров; здесь не коммитим автоматически
+            try:
+                result = await handler(event, data)
+            except Exception:
+                await session.rollback()
+                raise
+            # Явные коммиты хэндлеров идемпотентны; добиваем остаток здесь,
+            # чтобы ничего не потерялось (напр. flush из EnsureUser).
+            await session.commit()
             return result
 
 
@@ -49,7 +55,7 @@ class EnsureUserMiddleware(BaseMiddleware):
         tg_user = data.get("event_from_user")
         if session is not None and tg_user is not None:
             db_user = await repo.get_or_create_user(session, tg_user.id)
-            await session.commit()
+            await session.flush()  # коммит — на DbSessionMiddleware
             data["db_user"] = db_user
         return await handler(event, data)
 

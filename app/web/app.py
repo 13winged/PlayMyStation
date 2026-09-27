@@ -54,6 +54,8 @@ async def lifespan(app: FastAPI):
 
 def create_web_app() -> FastAPI:
     settings = get_settings()
+    if settings.use_webhook and not settings.webhook_secret:
+        raise RuntimeError("WEBHOOK_SECRET is required in webhook mode")
     app = FastAPI(title="PlayMyStation OAuth", lifespan=lifespan)
     app.include_router(oauth_router)
 

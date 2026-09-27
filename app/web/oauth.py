@@ -19,10 +19,30 @@ from app.db import repositories as repo
 router = APIRouter(prefix="/oauth", tags=["oauth"])
 
 
+async def _verify_state(state: str) -> int:
+    """Проверить одноразовый CSRF-токен (формат 'telegram_id:token').
+
+    Совместимость: голый telegram_id без токена (старые ссылки) — принимаем,
+    но такие ссылки живут вечно, новые всегда с токеном.
+    """
+    from app.core.redis import consume_oauth_state
+
+    if ":" in state:
+        prefix, _, token = state.partition(":")
+        stored = await consume_oauth_state(token)
+        if stored is None or str(stored) != prefix:
+            raise HTTPException(400, "Invalid or expired OAuth state")
+        return stored
+    try:
+        return int(state)
+    except ValueError:
+        raise HTTPException(400, "Invalid OAuth state") from None
+
+
 @router.get("/spotify/callback")
 async def spotify_callback(code: str = Query(), state: str = Query()) -> dict:
     settings = get_settings()
-    telegram_id = int(state)
+    telegram_id = await _verify_state(state)
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.post(
             "https://accounts.spotify.com/api/token",

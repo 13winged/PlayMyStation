@@ -66,8 +66,18 @@ def run_alembic_upgrade() -> None:
     log.info("DB migrations applied")
 
 
-async def init_db() -> None:
-    await asyncio.to_thread(run_alembic_upgrade)
+async def init_db(retries: int = 6, delay_s: float = 5.0) -> None:
+    """Миграции с ожиданием БД (compose depends_on не ждёт healthy)."""
+    last_error: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            await asyncio.to_thread(run_alembic_upgrade)
+            return
+        except Exception as e:  # noqa: BLE001 — БД может ещё вставать
+            last_error = e
+            log.warning("DB not ready (attempt %d/%d): %s", attempt, retries, e)
+            await asyncio.sleep(delay_s)
+    raise RuntimeError(f"DB migrations failed after {retries} attempts") from last_error
 
 
 def create_dispatcher() -> Dispatcher:

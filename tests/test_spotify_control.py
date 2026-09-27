@@ -117,9 +117,10 @@ class TestControlCapabilities:
 
 class TestControlScopes:
     def test_authorize_url_requests_control_scopes(self) -> None:
-        url = build_authorize_url(state="1")
+        url = build_authorize_url(1)
         assert "user-modify-playback-state" in url
         assert "user-library-modify" in url
+        assert "state=1" in url
 
 
 def test_track_kb_controls_row() -> None:

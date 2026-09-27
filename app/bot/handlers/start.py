@@ -13,7 +13,7 @@ from app.bot.keyboards import connect_kb, services_kb
 from app.core.redis import invalidate_now_playing_cache
 from app.db import repositories as repo
 from app.db.models import User
-from app.services.spotify import build_authorize_url as sp_auth_url
+from app.services.spotify import build_authorize_url_secure as sp_auth_url
 
 router = Router()
 
@@ -152,7 +152,7 @@ async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> 
         return await edit_text_safe(cb.message, text, reply_markup=markup)
 
     if provider == "spotify":
-        url = sp_auth_url(state=str(cb.from_user.id))
+        url = await sp_auth_url(cb.from_user.id)
         await _edit_msg(
             t(lang, "sp_connect"),
             connect_kb(provider, url, lang),

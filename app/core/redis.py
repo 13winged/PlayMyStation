@@ -25,7 +25,13 @@ async def get_redis() -> redis.Redis:
     global _redis
     if _redis is None:
         settings = get_settings()
-        _redis = redis.from_url(settings.redis_url, decode_responses=True)
+        _redis = redis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            health_check_interval=30,
+            socket_connect_timeout=5,
+            socket_timeout=5,
+        )
     return _redis
 
 
@@ -158,6 +164,37 @@ async def get_pending_youtube_oauth(telegram_id: int) -> dict | None:
 async def delete_pending_youtube_oauth(telegram_id: int) -> None:
     r = await get_redis()
     await r.delete(_yt_oauth_pending_key(telegram_id))
+
+
+# ----- OAuth state-токены (CSRF-защита привязки Spotify) -----
+
+OAUTH_STATE_TTL = 900
+
+
+def _oauth_state_key(token: str) -> str:
+    return f"oauth_state:{token}"
+
+
+async def save_oauth_state(token: str, telegram_id: int) -> None:
+    """Запомнить state→telegram_id на OAUTH_STATE_TTL."""
+    r = await get_redis()
+    await r.setex(_oauth_state_key(token), OAUTH_STATE_TTL, str(telegram_id))
+
+
+async def consume_oauth_state(token: str) -> int | None:
+    """Одноразово забрать telegram_id по state. None если нет/протух."""
+    r = await get_redis()
+    try:
+        raw = await r.get(_oauth_state_key(token))
+    except Exception:  # noqa: BLE001 — best-effort
+        return None
+    if raw is None:
+        return None
+    await r.delete(_oauth_state_key(token))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 # ----- Per-user locks (одна тяжёлая задача на юзера) -----
