@@ -241,6 +241,8 @@ def _download_youtube_sync(
             "noplaylist": True,
             "max_filesize": MAX_TRACK_BYTES,
             "logger": _YtDlpLogger(video_id),
+            # Node есть в образе, но yt-dlp по умолчанию включает только deno.
+            "js_runtimes": {"node": {"path": None}},
             "extractor_args": {"youtube": {"player_client": player_clients(bool(cookie_header))}},
         }
         if cookie_header:
