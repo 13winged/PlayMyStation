@@ -56,17 +56,32 @@ class TestTrackId:
 class TestPickBestDownloadInfo:
     def test_prefers_mp3_with_max_bitrate(self) -> None:
         infos = [
-            SimpleNamespace(codec="aac", bitrate_in_kbps=256),
-            SimpleNamespace(codec="mp3", bitrate_in_kbps=128),
-            SimpleNamespace(codec="mp3", bitrate_in_kbps=320),
+            SimpleNamespace(codec="aac", bitrate_in_kbps=256, preview=False),
+            SimpleNamespace(codec="mp3", bitrate_in_kbps=128, preview=False),
+            SimpleNamespace(codec="mp3", bitrate_in_kbps=320, preview=False),
         ]
         best = pick_best_download_info(infos)
         assert best is not None
         assert best.bitrate_in_kbps == 320
         assert best.codec == "mp3"
 
+    def test_skips_preview_variants(self) -> None:
+        """Превью-mp3 с высоким битрейтом проигрывает полному с низким."""
+        infos = [
+            SimpleNamespace(codec="mp3", bitrate_in_kbps=320, preview=True),
+            SimpleNamespace(codec="mp3", bitrate_in_kbps=128, preview=False),
+        ]
+        best = pick_best_download_info(infos)
+        assert best is not None
+        assert best.bitrate_in_kbps == 128
+
     def test_falls_back_to_any_codec_without_mp3(self) -> None:
-        infos = [SimpleNamespace(codec="aac", bitrate_in_kbps=256)]
+        infos = [SimpleNamespace(codec="aac", bitrate_in_kbps=256, preview=False)]
+        assert pick_best_download_info(infos) is infos[0]
+
+    def test_all_preview_still_returns_something(self) -> None:
+        """Если только превью — лучше превью, чем ничего."""
+        infos = [SimpleNamespace(codec="mp3", bitrate_in_kbps=192, preview=True)]
         assert pick_best_download_info(infos) is infos[0]
 
     def test_empty_returns_none(self) -> None:

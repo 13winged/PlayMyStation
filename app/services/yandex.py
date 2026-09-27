@@ -186,10 +186,18 @@ def candidate_track_ids(track_id: str) -> list[str]:
 
 
 def pick_best_download_info(infos: list[Any]) -> Any | None:
-    """Выбрать максимальное качество: сначала mp3, иначе любой кодек."""
+    """Выбрать максимальное качество: полный mp3, иначе любой полный, иначе любой.
+
+    Превью-варианты (короткие сэмплы) отсекаем — как yamusic-downloader-pro:
+    `codec === 'mp3' && !preview`. getattr с дефолтом — на случай старых
+    версий библиотеки без поля preview.
+    """
     pool = list(infos or [])
     if not pool:
         return None
-    mp3 = [i for i in pool if getattr(i, "codec", "") == "mp3"]
-    candidates = mp3 or pool
-    return max(candidates, key=lambda i: getattr(i, "bitrate_in_kbps", 0) or 0)
+    full = [i for i in pool if not getattr(i, "preview", False)]
+    candidates = full or pool
+    mp3 = [i for i in candidates if getattr(i, "codec", "") == "mp3"]
+    return max(
+        mp3 or candidates, key=lambda i: getattr(i, "bitrate_in_kbps", 0) or 0
+    )
