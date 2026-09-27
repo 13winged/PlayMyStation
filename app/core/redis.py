@@ -158,3 +158,24 @@ async def get_pending_youtube_oauth(telegram_id: int) -> dict | None:
 async def delete_pending_youtube_oauth(telegram_id: int) -> None:
     r = await get_redis()
     await r.delete(_yt_oauth_pending_key(telegram_id))
+
+
+# ----- Per-user locks (одна тяжёлая задача на юзера) -----
+
+
+async def acquire_lock(key: str, ttl_s: int) -> bool:
+    """Занять именованный лок (SET NX EX). False если уже занят."""
+    r = await get_redis()
+    try:
+        return bool(await r.set(f"lock:{key}", "1", nx=True, ex=ttl_s))
+    except Exception:  # noqa: BLE001 — без Redis не блокируем работу
+        log.debug("lock acquire failed for %s", key)
+        return True
+
+
+async def release_lock(key: str) -> None:
+    r = await get_redis()
+    try:
+        await r.delete(f"lock:{key}")
+    except Exception:  # noqa: BLE001, S110 — best-effort, delete идемпотентен
+        pass

@@ -156,6 +156,10 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "lfm_ok": "✅ Last.fm подключён (<code>{username}</code>). Жми /now 🎵",
         "lfm_active": "🟪 Активный сервис: <b>Last.fm</b>. Жми /now 🎵",
+        # Скачивание по ссылке
+        "link_busy": "⏳ Уже качаю предыдущую ссылку, дождись.",
+        "link_need_yandex": "❌ Для ссылок Яндекса подключи его: /yandex.",
+        "link_failed": "❌ Не получилось скачать по ссылке. Попробуй другую.",
         # /now
         "now_no_services": (
             "❌ Нет привязанных сервисов.\nОткрой /services и подключи хотя бы один."
@@ -350,6 +354,9 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
         "lfm_ok": "✅ Last.fm connected (<code>{username}</code>). Hit /now 🎵",
         "lfm_active": "🟪 Active service: <b>Last.fm</b>. Hit /now 🎵",
+        "link_busy": "⏳ Still downloading the previous link, hold on.",
+        "link_need_yandex": "❌ For Yandex links, connect it first: /yandex.",
+        "link_failed": "❌ Couldn't download from this link. Try another one.",
         "now_no_services": (
             "❌ No connected services.\nOpen /services and connect at least one."
         ),

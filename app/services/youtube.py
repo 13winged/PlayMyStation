@@ -150,6 +150,51 @@ async def check_auth(auth_json: str) -> bool:
     return True
 
 
+def _video_meta_sync(video_id: str) -> dict | None:
+    """Метаданные публичного видео без авторизации. Синхронная."""
+    from ytmusicapi import YTMusic  # lazy import — тяжёлая зависимость
+
+    try:
+        song = YTMusic().get_song(video_id)
+    except Exception:  # noqa: BLE001 — best-effort
+        return None
+    details = song.get("videoDetails") if isinstance(song, dict) else None
+    if not isinstance(details, dict):
+        return None
+    return details
+
+
+async def youtube_video_meta(video_id: str) -> TrackDTO | None:
+    """TrackDTO из публичного YouTube-видео (для докачки по ссылке)."""
+    details = await asyncio.to_thread(_video_meta_sync, video_id)
+    if not details:
+        return None
+    title = details.get("title") or "Unknown title"
+    artist = details.get("author") or "Unknown artist"
+    thumbs = details.get("thumbnail") or {}
+    cover = None
+    if isinstance(thumbs, dict):
+        items = thumbs.get("thumbnails") or []
+        if items and isinstance(items[-1], dict):
+            cover = items[-1].get("url")
+    duration_ms = None
+    length = details.get("lengthSeconds")
+    try:
+        duration_ms = int(length) * 1000 if length is not None else None
+    except (TypeError, ValueError):
+        duration_ms = None
+    return TrackDTO(
+        title=str(title),
+        artist=str(artist),
+        duration_ms=duration_ms,
+        is_playing=False,
+        cover_url=cover,
+        track_url=f"https://music.youtube.com/watch?v={video_id}",
+        provider="youtube",
+        track_id=video_id,
+    )
+
+
 def _download_youtube_sync(
     video_id: str, cookie_header: str | None = None
 ) -> tuple[bytes, str] | None:

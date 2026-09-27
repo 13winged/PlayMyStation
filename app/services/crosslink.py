@@ -203,3 +203,42 @@ async def match_same_track(
         await CROSSLINK_CIRCUIT.record_success()
         await set_cached_platform_links(cache_key, links)
     return links
+
+
+def spotify_meta_to_dto(data: dict, page_url: str) -> TrackDTO:
+    """Метаданные GET /v1/tracks/{id} (app-токен) → TrackDTO для докачки по ссылке."""
+    artists = ", ".join(a.get("name", "") for a in data.get("artists", [])) or "Unknown artist"
+    images = (data.get("album") or {}).get("images") or []
+    return TrackDTO(
+        title=data.get("name", "Unknown title"),
+        artist=artists,
+        album=(data.get("album") or {}).get("name"),
+        duration_ms=data.get("duration_ms"),
+        is_playing=False,
+        cover_url=images[0]["url"] if images else None,
+        track_url=page_url,
+        provider="spotify",
+        preview_url=data.get("preview_url"),
+        track_id=data.get("id"),
+    )
+
+
+async def spotify_track_meta(track_id: str) -> TrackDTO | None:
+    """Метаданные публичного Spotify-трека по ID (app-токен, без юзера)."""
+    token = await _spotify_app_token()
+    if token is None:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=SEARCH_TIMEOUT) as client:
+            resp = await client.get(
+                f"https://api.spotify.com/v1/tracks/{track_id}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+    except (httpx.TimeoutException, httpx.NetworkError, httpx.ProtocolError):
+        return None
+    if resp.status_code != 200:
+        return None
+    data = resp.json()
+    if not isinstance(data, dict):
+        return None
+    return spotify_meta_to_dto(data, f"https://open.spotify.com/track/{track_id}")

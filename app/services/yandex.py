@@ -73,6 +73,13 @@ class YandexMusicService(BaseMusicService):
             return None
         return self._track_dto_from_full(tracks[0])
 
+    async def fetch_track(self, track_ref: str) -> TrackDTO | None:
+        """Метаданные трека по ID ('id' или 'id:albumId') для докачки по ссылке."""
+        try:
+            return await asyncio.to_thread(self._fetch_track_sync, track_ref)
+        except Exception:  # noqa: BLE001 — best-effort
+            return None
+
     def _fetch_queue_sync(self) -> TrackDTO | None:
         client = make_yandex_client(self._token)
         queues = client.queues_list()
@@ -130,7 +137,7 @@ class YandexMusicService(BaseMusicService):
             await YANDEX_CIRCUIT.record_success()
         return track
 
-    async def download_track(self, track: TrackDTO) -> tuple[bytes, str] | None:
+    async def download_track(self, track: TrackDTO, youtube_auth: str | None = None) -> tuple[bytes, str] | None:
         """Скачать полный трек через прямые ссылки (токен юзера, его подписка)."""
         if not track.track_id:
             log.info("yandex download: no track_id for '%s'", track.title)

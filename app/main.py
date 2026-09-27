@@ -21,6 +21,7 @@ from alembic import command
 from app.bot.commands import setup_bot_meta
 from app.bot.handlers import lang as lang_handlers
 from app.bot.handlers import lastfm_auth as lastfm_handlers
+from app.bot.handlers import link as link_handlers
 from app.bot.handlers import now as now_handlers
 from app.bot.handlers import spotify_auth as spotify_handlers
 from app.bot.handlers import start as start_handlers
@@ -89,6 +90,7 @@ def create_dispatcher() -> Dispatcher:
         youtube_handlers.router,
         lastfm_handlers.router,
         lang_handlers.router,
+        link_handlers.router,  # последним: ловит любой текст со ссылкой
     )
     return dp
 
