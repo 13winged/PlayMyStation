@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎵 PlayMyStation
+# 🎵 PlayMyStation @playmystation_bot
 
 **One `/now` for all your music — Spotify, Yandex Music, YouTube Music and Last.fm in a single Telegram bot.**
 
