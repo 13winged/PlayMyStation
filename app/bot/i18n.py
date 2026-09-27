@@ -161,6 +161,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "link_busy": "⏳ Уже качаю предыдущую ссылку, дождись.",
         "link_need_yandex": "❌ Для ссылок Яндекса подключи его: /yandex.",
         "link_failed": "❌ Не получилось скачать по ссылке. Попробуй другую.",
+        "link_cookies_expired": (
+            "🍪 Куки YouTube протухли (Google их периодически ротирует). "
+            "Перепривяжи: /youtube — свежие заголовки или вход через Google."
+        ),
         # /now
         "now_no_services": (
             "❌ Нет привязанных сервисов.\nОткрой /services и подключи хотя бы один."
@@ -359,6 +363,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "link_busy": "⏳ Still downloading the previous link, hold on.",
         "link_need_yandex": "❌ For Yandex links, connect it first: /yandex.",
         "link_failed": "❌ Couldn't download from this link. Try another one.",
+        "link_cookies_expired": (
+            "🍪 YouTube cookies expired (Google rotates them periodically). "
+            "Relink: /youtube — fresh headers or Google sign-in."
+        ),
         "now_no_services": (
             "❌ No connected services.\nOpen /services and connect at least one."
         ),

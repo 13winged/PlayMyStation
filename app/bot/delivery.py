@@ -21,6 +21,7 @@ from app.db.models import User
 from app.services.audio import audio_cache_key, safe_filename
 from app.services.base import BaseMusicService, TrackDTO
 from app.services.factory import build_service
+from app.services.youtube import YouTubeAuthExpired
 
 log = logging.getLogger("playmystation.delivery")
 
@@ -74,6 +75,8 @@ async def download_for_track(
             svc.download_track(track, youtube_auth=youtube_auth),
             timeout=DOWNLOAD_TIMEOUT,
         )
+    except YouTubeAuthExpired:
+        raise
     except (TimeoutError, Exception):  # noqa: BLE001 — докачка не обязана успевать
         log.info("download failed/timeout: %s '%s'", track.provider, track.title)
         return None
@@ -99,8 +102,12 @@ async def store_to_cache_channel(
         log.info("audio cache channel store failed", exc_info=True)
 
 
-async def fetch_and_send(message: Message, db_user: User, track: TrackDTO) -> bool:
-    """Полный цикл отдачи аудио. True если аудио ушло в чат."""
+async def fetch_and_send(
+    message: Message, db_user: User, track: TrackDTO, notify_auth_expired: bool = False
+) -> bool:
+    """Полный цикл отдачи аудио. True если делать больше нечего
+    (аудио ушло ИЛИ юзер уже уведомлён)."""
+    from app.bot.i18n import lang_of, t
     cache_key = audio_cache_key(track)
     if cache_key is None:
         return False
@@ -125,6 +132,12 @@ async def fetch_and_send(message: Message, db_user: User, track: TrackDTO) -> bo
             )
             await store_to_cache_channel(message.bot, cache_key, data, filename, track)
             return True
+    except YouTubeAuthExpired:
+        if notify_auth_expired:
+            await message.answer(t(lang_of(db_user), "link_cookies_expired"))
+        else:
+            log.info("youtube cookies expired for '%s'", track.title)
+        return True
     except Exception:
         log.exception("delivery crashed")
         return False

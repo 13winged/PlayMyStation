@@ -195,11 +195,20 @@ async def youtube_video_meta(video_id: str) -> TrackDTO | None:
     )
 
 
+class YouTubeAuthExpired(Exception):
+    """Куки привязки протухли (Google их ротирует) — нужна перепривязка."""
+
+    def __init__(self, video_id: str) -> None:
+        super().__init__(video_id)
+        self.video_id = video_id
+
+
 class _YtDlpLogger:
     """Проброс ошибок yt-dlp в наш лог (иначе фейлы молчаливые)."""
 
     def __init__(self, video_id: str) -> None:
         self._video_id = video_id
+        self.cookies_invalid = False
 
     def debug(self, msg: str) -> None:
         pass
@@ -208,6 +217,8 @@ class _YtDlpLogger:
         log.info("yt-dlp [%s]: %s", self._video_id, msg)
 
     def error(self, msg: str) -> None:
+        if "cookies are no longer valid" in msg.lower():
+            self.cookies_invalid = True
         log.warning("yt-dlp [%s] ERROR: %s", self._video_id, msg)
 
 
@@ -233,6 +244,7 @@ def _download_youtube_sync(
 
     url = f"https://music.youtube.com/watch?v={video_id}"
     with tempfile.TemporaryDirectory(prefix="pms-yt-") as workdir:
+        logger = _YtDlpLogger(video_id)
         opts: dict = {
             "format": "bestaudio[ext=m4a]/bestaudio/best",
             "outtmpl": os.path.join(workdir, "%(id)s.%(ext)s"),
@@ -240,7 +252,7 @@ def _download_youtube_sync(
             "no_warnings": True,
             "noplaylist": True,
             "max_filesize": MAX_TRACK_BYTES,
-            "logger": _YtDlpLogger(video_id),
+            "logger": logger,
             # Node есть в образе, но yt-dlp по умолчанию включает только deno.
             "js_runtimes": {"node": {"path": None}},
             "extractor_args": {"youtube": {"player_client": player_clients(bool(cookie_header))}},
@@ -250,8 +262,13 @@ def _download_youtube_sync(
             with open(cookie_file, "w", encoding="utf-8") as f:
                 f.write(cookie_header_to_netscape(cookie_header))
             opts["cookiefile"] = cookie_file
-        with YoutubeDL(opts) as ydl:
-            ydl.download([url])
+        try:
+            with YoutubeDL(opts) as ydl:
+                ydl.download([url])
+        except Exception:
+            if logger.cookies_invalid:
+                raise YouTubeAuthExpired(video_id)
+            raise
         for name in os.listdir(workdir):
             if name.startswith(video_id):
                 ext = name.rsplit(".", 1)[-1] if "." in name else "m4a"
@@ -400,6 +417,9 @@ async def download_by_query(
     try:
         async with asyncio.timeout(110):
             result = await asyncio.to_thread(_download_youtube_sync, video_id, cookie)
+    except YouTubeAuthExpired:
+        await YOUTUBE_CIRCUIT.record_failure()
+        raise
     except (TimeoutError, Exception):  # noqa: BLE001 — best-effort докачка
         await YOUTUBE_CIRCUIT.record_failure()
         return None
@@ -498,6 +518,9 @@ class YouTubeMusicService(BaseMusicService):
                 data_ext = await asyncio.to_thread(
                     _download_youtube_sync, track.track_id, cookie
                 )
+        except YouTubeAuthExpired:
+            await YOUTUBE_CIRCUIT.record_failure()
+            raise
         except (TimeoutError, Exception):  # noqa: BLE001 — best-effort докачка
             await YOUTUBE_CIRCUIT.record_failure()
             return None

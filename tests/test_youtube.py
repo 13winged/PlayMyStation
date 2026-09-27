@@ -83,6 +83,56 @@ def test_player_clients() -> None:
     assert player_clients(False) == ["android", "web"]
 
 
+def _stub_ytdlp(monkeypatch, fail_message: str | None) -> None:
+    import sys
+    import types
+
+    import app.services.youtube as yt_mod  # noqa: F401
+
+    class FakeYDL:
+        def __init__(self, opts):
+            self._opts = opts
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def download(self, urls):
+            if fail_message is not None:
+                self._opts["logger"].error(fail_message)
+                raise RuntimeError("download failed")
+
+    mod = types.ModuleType("yt_dlp")
+    mod.YoutubeDL = FakeYDL
+    monkeypatch.setitem(sys.modules, "yt_dlp", mod)
+
+
+def test_download_raises_auth_expired_on_stale_cookies(monkeypatch) -> None:
+    import app.services.youtube as yt_mod
+    from app.services.youtube import YouTubeAuthExpired
+
+    _stub_ytdlp(
+        monkeypatch,
+        "[youtube] vid: The provided YouTube account cookies are no longer valid. Rotated.",
+    )
+    with pytest.raises(YouTubeAuthExpired):
+        yt_mod._download_youtube_sync("vid", "SID=x")
+
+
+def test_download_reraises_other_errors(monkeypatch) -> None:
+    import app.services.youtube as yt_mod
+    from app.services.youtube import YouTubeAuthExpired
+
+    _stub_ytdlp(monkeypatch, "[youtube] vid: some other failure")
+    with pytest.raises(RuntimeError):
+        try:
+            yt_mod._download_youtube_sync("vid", "SID=x")
+        except YouTubeAuthExpired:
+            pytest.fail("must not map generic errors to expired cookies")
+
+
 def test_cookie_header_to_netscape_format() -> None:
     out = cookie_header_to_netscape("SID=aaa; __Secure-3PAPISID=bbb; broken; =x")
     lines = out.strip().split("\n")

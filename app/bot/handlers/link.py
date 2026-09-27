@@ -183,7 +183,7 @@ async def cmd_link(message: Message, session: AsyncSession, db_user: User) -> No
 
 async def _deliver_link(message: Message, db_user: User, track: TrackDTO, lock_key: str) -> None:
     try:
-        ok = await fetch_and_send(message, db_user, track)
+        ok = await fetch_and_send(message, db_user, track, notify_auth_expired=True)
         if not ok:
             await message.answer(t(lang_of(db_user), "link_failed"))
     finally:
