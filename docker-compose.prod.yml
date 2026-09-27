@@ -9,6 +9,8 @@ services:
     restart: unless-stopped
   ynison:
     restart: unless-stopped
+  backup:
+    restart: unless-stopped
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped

@@ -111,6 +111,24 @@ WEBHOOK_PATH=/webhook
 - **Пробы**: `/health` (liveness, всегда 200) и `/ready` (проверяет PostgreSQL
   и Redis, 503 если недоступны) — для Docker healthcheck и балансировщиков.
 
+## Бэкапы
+
+Сервис `backup` (образ `postgres:16-alpine`) делает `pg_dump -Fc` ежедневно
+в 03:00 в volume `pgbackups`, ротация — `BACKUP_RETENTION_DAYS` суток (default 7).
+Первый бэкап — сразу при старте/деплоe. Логи: `docker compose logs backup`.
+
+Проверить дампы: `docker compose exec backup ls -la /backups`
+
+Восстановление (осторожно — перезаписывает БД):
+```bash
+cd ~/playmystation
+docker compose exec -T postgres pg_restore -U playmystation -d playmystation \
+  --clean --if-exists < "$(docker compose exec backup ls -1 /backups/playmystation-*.dump | sort | tail -1 | tr -d '\r')"
+```
+
+Для офсайта достаточно периодически забирать файлы из volume:
+`docker cp playmystation-backup-1:/backups ./pgbackups-$(date +%F)`
+
 ## Эксплуатация (выученные уроки)- **Никогда `docker compose down -v` на проде**: сносит volume `pgdata` (все пользователи и интеграции) и `caddy_data` (Let's Encrypt сертификаты → TLS ляжет + rate limit на перевыпуск). Деплой-скрипт чистит только контейнеры и дублирующиеся сети, volumes не трогает.
 - **Дубли сетей**: после упавших деплоев могут остаться две сети `playmystation_default` (`network ... is ambiguous`). Чинятся удалением по ID: `docker network ls --filter name=playmystation -q | xargs -r docker network rm` (уже встроено в deploy).
 - **Миграции Alembic — в git**: `alembic/versions/*.py` обязаны коммититься, иначе `upgrade head` на сервере — no-op и таблиц не будет (`relation "users" does not exist`).

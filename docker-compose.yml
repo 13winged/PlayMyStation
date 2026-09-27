@@ -31,5 +31,24 @@ services:
     ports:
       - "8000:8000"
 
+  # Ежедневный pg_dump в 03:00 + ротация (BACKUP_RETENTION_DAYS, default 7).
+  # Первый бэкап — сразу при старте (с ретраями, пока встаёт postgres).
+  backup:
+    image: postgres:16-alpine
+    depends_on:
+      - postgres
+    env_file: .env
+    environment:
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./scripts/pg_backup.sh:/scripts/pg_backup.sh:ro
+      - pgbackups:/backups
+    entrypoint: >
+      sh -c 'echo "0 3 * * * sh /scripts/pg_backup.sh >>/var/log/backup.log 2>&1" | crontab -
+      && for i in 1 2 3 4 5 6; do sh /scripts/pg_backup.sh >>/var/log/backup.log 2>&1 && break || sleep 10; done
+      && exec crond -f -l 2'
+
 volumes:
   pgdata:
+  pgbackups:

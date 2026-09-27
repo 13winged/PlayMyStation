@@ -38,7 +38,7 @@
 - [x] Webhook-режим (сертификат, секрет) + dual polling/webhook + graceful shutdown
 - [x] CI (ruff/pytest/docker build) + CD на VPS через GitHub Actions (SSH + Deploy Key) + Caddy (https)
 - [x] Метрики Prometheus (`/metrics`: апдейты, провайдеры, кэш, circuit breakers, HTTP) + Sentry (по `SENTRY_DSN`) + structlog (`LOG_FORMAT=json`) + пробы `/health`/`/ready`
-- [ ] Бэкапы Postgres
+- [x] Бэкапы Postgres (`backup`-сервис: pg_dump daily 03:00, ротация `BACKUP_RETENTION_DAYS`, volume `pgbackups`)
 - [ ] Ротация Fernet-ключей, audit-log подключений
 
 ## Текущий статус прода (2026-09-26)
