@@ -65,6 +65,8 @@ def normalize_headers_raw(headers_raw: str) -> str:
 # В истории YT для видео вторым «артистом» часто прилетает счётчик
 # просмотров ("29M views", "1,1 млн просмотров") — вычищаем.
 _VIEWS_RE = re.compile(r"view|просмотр|stream|listen", re.IGNORECASE)
+# Автогенерированные каналы вида "Joji - Topic" — режем суффикс.
+_TOPIC_RE = re.compile(r"\s+-\s+topic$", re.IGNORECASE)
 
 
 def validate_auth_json(auth_json: str) -> None:
@@ -168,6 +170,9 @@ def _download_youtube_sync(
             "no_warnings": True,
             "noplaylist": True,
             "max_filesize": MAX_TRACK_BYTES,
+            # Android-клиент обходит "Sign in to confirm you're not a bot"
+            # (проверки бьют в основном по WEB-клиентам); web — фолбэк.
+            "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
         }
         if cookie_header:
             cookie_file = os.path.join(workdir, "cookies.txt")
@@ -363,11 +368,11 @@ class YouTubeMusicService(BaseMusicService):
         if isinstance(raw_artists, dict):
             raw_artists = [raw_artists]
         names = [
-            a.get("name", "")
+            _TOPIC_RE.sub("", a.get("name", ""))
             for a in raw_artists
             if isinstance(a, dict) and a.get("name") and not _VIEWS_RE.search(a["name"])
         ]
-        artist = ", ".join(names) or "Unknown artist"
+        artist = ", ".join(n for n in names if n) or "Unknown artist"
 
         album = item.get("album")
         if isinstance(album, dict):

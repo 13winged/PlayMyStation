@@ -77,6 +77,17 @@ def test_youtube_dto_filters_view_counts_from_artists() -> None:
     assert dto.artist == "Joji"
 
 
+def test_youtube_dto_strips_topic_suffix() -> None:
+    """Автогенерированные каналы 'Artist - Topic' чистятся до имени."""
+    raw = {
+        "videoId": "xyz",
+        "title": "T",
+        "artists": [{"name": "Joji - Topic"}],
+    }
+    dto = YouTubeMusicService._to_dto(raw)
+    assert dto.artist == "Joji"
+
+
 def test_extract_code_bare() -> None:
     from app.bot.handlers.spotify_auth import extract_code_and_state
 
