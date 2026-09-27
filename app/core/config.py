@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     # Last.fm: только API-ключ сервера + username юзера (OAuth не нужен)
     lastfm_api_key: str = Field(default="", alias="LASTFM_API_KEY")
 
+    # Прокси только для Яндекс Музыки (очередь + download-info виснут с DC-IP).
+    # Формат: http://user:pass@host:port (или без auth). Пусто — напрямую.
+    yandex_proxy_url: str = Field(default="", alias="YANDEX_PROXY_URL")
+
     # YouTube Music OAuth (device-flow): Google Cloud Console → YouTube Data API v3
     # включён → OAuth-клиент типа «TVs and Limited Input devices».
     ytm_oauth_client_id: str = Field(default="", alias="YTM_OAUTH_CLIENT_ID")

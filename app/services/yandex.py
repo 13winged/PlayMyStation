@@ -23,6 +23,20 @@ from app.services.ynison import Ynison, YnisonError
 log = logging.getLogger("playmystation.yandex")
 
 
+def make_yandex_client(oauth_token: str):
+    """Client Яндекс Музыки; при заданном YANDEX_PROXY_URL — через прокси."""
+    from yandex_music import Client  # lazy import — тяжёлая зависимость
+
+    from app.core.config import get_settings
+
+    proxy = get_settings().yandex_proxy_url or None
+    if proxy:
+        from yandex_music.utils.request import Request  # lazy import
+
+        return Client(oauth_token, request=Request(proxy_url=proxy)).init()
+    return Client(oauth_token).init()
+
+
 class YandexMusicService(BaseMusicService):
     provider = "yandex"
 
@@ -53,18 +67,14 @@ class YandexMusicService(BaseMusicService):
         )
 
     def _fetch_track_sync(self, track_id: str) -> TrackDTO | None:
-        from yandex_music import Client  # lazy import — тяжёлая зависимость
-
-        client = Client(self._token).init()
+        client = make_yandex_client(self._token)
         tracks = client.tracks([track_id])
         if not tracks:
             return None
         return self._track_dto_from_full(tracks[0])
 
     def _fetch_queue_sync(self) -> TrackDTO | None:
-        from yandex_music import Client  # lazy import — тяжёлая зависимость
-
-        client = Client(self._token).init()
+        client = make_yandex_client(self._token)
         queues = client.queues_list()
         if not queues:
             return None
@@ -152,9 +162,7 @@ class YandexMusicService(BaseMusicService):
         return data, ext
 
     def _direct_link_sync(self, track_id: str) -> tuple[str | None, str]:
-        from yandex_music import Client  # lazy import — тяжёлая зависимость
-
-        client = Client(self._token).init()
+        client = make_yandex_client(self._token)
         for candidate in candidate_track_ids(track_id):
             tracks = client.tracks([candidate])
             if not tracks:

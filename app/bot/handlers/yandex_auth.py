@@ -54,9 +54,9 @@ async def cmd_yandex(
 
     def _check() -> bool:
         try:
-            from yandex_music import Client
+            from app.services.yandex import make_yandex_client
 
-            Client(token).init()
+            make_yandex_client(token)
             return True
         except Exception:  # noqa: BLE001 — любая ошибка = невалидный токен
             return False
