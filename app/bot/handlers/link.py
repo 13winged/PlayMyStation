@@ -37,6 +37,60 @@ YOUTUBE_VIDEO_RE = re.compile(
     r"([A-Za-z0-9_-]{6,})"
 )
 
+# Кэш id/username бота для детекта реплаев и упоминаний в группах.
+_bot_id: int | None = None
+_bot_username: str = ""
+
+
+async def _bot_identity(message: Message) -> tuple[int, str]:
+    """(id, @username) бота с кешем на жизнь процесса."""
+    global _bot_id, _bot_username
+    if _bot_id is None:
+        me = await message.bot.get_me()
+        _bot_id = me.id
+        _bot_username = (me.username or "").lower()
+    return _bot_id, _bot_username
+
+
+def combined_text(message: Message) -> str:
+    """Свой текст + текст/подпись сообщения, на которое реплай."""
+    parts = [message.text or ""]
+    replied = message.reply_to_message
+    if replied is not None:
+        parts.append(replied.text or "")
+        parts.append(replied.caption or "")
+    return "\n".join(p for p in parts if p)
+
+
+async def should_handle_link(message: Message) -> tuple[str, str] | None:
+    """Решить, обрабатывать ли сообщение как ссылку на трек.
+
+    Личка: любая ссылка. Группа: ссылка в своём тексте (privacy OFF),
+    упоминание бота или реплай на его сообщение (работает и с privacy ON).
+    Возвращает (provider, id) или None.
+    """
+    own_text = message.text or ""
+    parsed = parse_track_link(combined_text(message))
+    if parsed is None:
+        return None
+    if message.chat.type == "private":
+        return parsed
+    bot_id, username = await _bot_identity(message)
+    if username and f"@{username}" in own_text.lower():
+        return parsed
+    replied = message.reply_to_message
+    if (
+        replied is not None
+        and replied.from_user is not None
+        and replied.from_user.is_bot
+        and replied.from_user.id == bot_id
+    ):
+        return parsed
+    # Группа с выключенной приватностью: доходят все сообщения.
+    if parse_track_link(own_text) is not None:
+        return parsed
+    return None
+
 
 def parse_track_link(text: str) -> tuple[str, str] | None:
     """Найти ссылку на одиночный трек. Возвращает (provider, id) или None.
@@ -84,10 +138,10 @@ async def _resolve_track(
 @router.message(F.text, ~F.text.startswith("/"))
 async def cmd_link(message: Message, session: AsyncSession, db_user: User) -> None:
     lang = lang_of(db_user)
-    parsed = parse_track_link(message.text or "")
-    if parsed is None:
+    resolved = await should_handle_link(message)
+    if resolved is None:
         return
-    provider, ref = parsed
+    provider, ref = resolved
 
     lock_key = f"linkdl:{db_user.telegram_id}"
     if not await acquire_lock(lock_key, 180):

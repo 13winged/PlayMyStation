@@ -109,3 +109,97 @@ async def test_youtube_video_meta(monkeypatch) -> None:
     assert dto.duration_ms == 213_000
     assert dto.track_id == "vid123"
     assert dto.provider == "youtube"
+
+
+def _mock_message(
+    text: str = "",
+    chat_type: str = "private",
+    reply_text: str | None = None,
+    reply_from_bot_id: int | None = None,
+) -> object:
+    from unittest.mock import AsyncMock, MagicMock
+
+    from aiogram.types import Chat
+
+    bot = AsyncMock()
+    bot.get_me.return_value = MagicMock(id=999, username="PlayMyStationBot")
+    message = MagicMock()
+    message.text = text
+    message.chat = Chat(id=1, type=chat_type, title="g")
+    message.bot = bot
+    if reply_text is None and reply_from_bot_id is None:
+        message.reply_to_message = None
+    else:
+        replied = MagicMock()
+        replied.text = reply_text
+        replied.caption = None
+        replied.from_user = MagicMock(is_bot=True, id=reply_from_bot_id)
+        message.reply_to_message = replied
+    return message
+
+
+class TestShouldHandleLink:
+    def _reset_identity(self) -> None:
+        import app.bot.handlers.link as link_mod
+
+        link_mod._bot_id = None
+        link_mod._bot_username = ""
+
+    @pytest.mark.asyncio
+    async def test_private_any_link(self) -> None:
+        from app.bot.handlers.link import should_handle_link
+
+        self._reset_identity()
+        msg = _mock_message("https://youtu.be/dQw4w9WgXcQ", "private")
+        assert await should_handle_link(msg) == ("youtube", "dQw4w9WgXcQ")
+
+    @pytest.mark.asyncio
+    async def test_group_plain_link(self) -> None:
+        """Группа с выключенной приватностью: обычная ссылка обрабатывается."""
+        from app.bot.handlers.link import should_handle_link
+
+        self._reset_identity()
+        msg = _mock_message("https://youtu.be/dQw4w9WgXcQ", "group")
+        assert await should_handle_link(msg) == ("youtube", "dQw4w9WgXcQ")
+
+    @pytest.mark.asyncio
+    async def test_group_mention(self) -> None:
+        from app.bot.handlers.link import should_handle_link
+
+        self._reset_identity()
+        msg = _mock_message("@playmystationbot качни https://youtu.be/dQw4w9WgXcQ", "group")
+        assert await should_handle_link(msg) == ("youtube", "dQw4w9WgXcQ")
+
+    @pytest.mark.asyncio
+    async def test_group_reply_to_bot_uses_replied_link(self) -> None:
+        from app.bot.handlers.link import should_handle_link
+
+        self._reset_identity()
+        msg = _mock_message(
+            "качни это",
+            "group",
+            reply_text="https://open.spotify.com/track/6rqhFgbbKwnb9MLmUQDw0G9",
+            reply_from_bot_id=999,
+        )
+        assert await should_handle_link(msg) == ("spotify", "6rqhFgbbKwnb9MLmUQDw0G9")
+
+    @pytest.mark.asyncio
+    async def test_group_reply_to_human_ignored(self) -> None:
+        from app.bot.handlers.link import should_handle_link
+
+        self._reset_identity()
+        msg = _mock_message(
+            "согласен",
+            "group",
+            reply_text="https://youtu.be/dQw4w9WgXcQ",
+            reply_from_bot_id=123,
+        )
+        assert await should_handle_link(msg) is None
+
+    @pytest.mark.asyncio
+    async def test_no_link_returns_none(self) -> None:
+        from app.bot.handlers.link import should_handle_link
+
+        self._reset_identity()
+        msg = _mock_message("просто текст", "group")
+        assert await should_handle_link(msg) is None

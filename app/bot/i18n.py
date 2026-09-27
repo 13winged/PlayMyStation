@@ -21,7 +21,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "• /now или /np — что сейчас играет (+ пришлю трек)\n"
             "• /spotify /yandex /youtube /lastfm — выбрать сервис (или подключить)\n"
             "• /lang — язык (RU/EN)\n"
-            "• /disconnect &lt;provider&gt; — отключить сервис"
+            "• /disconnect &lt;provider&gt; — отключить сервис\n"
+            "• В группах: кинь ссылку на трек (или ответь мне реплаем с ссылкой)"
         ),
         "services_text": (
             "⚙️ <b>Мои сервисы</b>\nНажми на сервис, чтобы подключить / отключить. "
@@ -223,7 +224,8 @@ STRINGS: dict[str, dict[str, str]] = {
             "• /now or /np — what's playing now (+ I'll send the track)\n"
             "• /spotify /yandex /youtube /lastfm — select a service (or connect it)\n"
             "• /lang — language (RU/EN)\n"
-            "• /disconnect &lt;provider&gt; — disconnect a service"
+            "• /disconnect &lt;provider&gt; — disconnect a service\n"
+            "• In groups: drop a track link (or reply to me with a link)"
         ),
         "services_text": (
             "⚙️ <b>My services</b>\nTap a service to connect / disconnect. "
