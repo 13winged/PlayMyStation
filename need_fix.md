@@ -1,7 +1,8 @@
 # 📋 PlayMyStation — Список ошибок и улучшений (Аудит)
 
-> Сгенерировано автоматически после полного аудита кодовой базы.  
-> Статус: **Открыто** — требуется ревью и планирование.
+> Сгенерировано автоматически после полного аудита кодовой базы.
+> Статус: **В работе** — P0+P1 применены коммитами `885fd86` + `aca5897`
+> (200 тестов ✅, ruff ✅). Отклонённые пункты помечены с причиной.
 
 ---
 
@@ -30,17 +31,18 @@ async with self._factory() as session:
 
 ---
 
-### 2. Circuit Breaker не thread-safe
-**Файл:** `app/core/retry.py:16-72`  
-**Проблема:** `is_open` property читает/пишет `_state` и `_failures` без лока при параллельных вызовах (`asyncio.gather` в `resolve_now_playing`).  
-**Исправление:** Весь доступ к состоянию под `asyncio.Lock` (вынести проверку в `async def check_open()`).
+### 2. Circuit Breaker не thread-safe — ❌ ОТКЛОНЕНО (ложное срабатывание)
+**Файл:** `app/core/retry.py:16-72`
+Проверка: asyncio однопоточен, в property `is_open` нет await между чтением
+и записью — гонки нет (важно только для тредов, а `record_*` вызываются из
+async-контекста под локом). Исправлять нечего.
 
 ---
 
-### 3. Yandex Music: `asyncio.to_thread()` создаёт поток на каждый вызов — thread explosion
-**Файл:** `app/services/yandex.py:76-81, 96-138`  
-**Проблема:** При спаме `/now` или параллельных юзерах — OOM от неограниченного пула потоков. `yandex_music.Client` не thread-safe.  
-**Исправление:** Вынести в `ThreadPoolExecutor(max_workers=4)` с лимитом, либо переписать на асинхронный клиент.
+### 3. Yandex Music: `asyncio.to_thread()` — ⚠️ ЧАСТИЧНО (пул потоков ограничен)
+`to_thread` использует общий executor (лимит потоков), explosion нет.
+Контроль нагрузки решён семафором докачек (`DOWNLOAD_SEMAPHORE(3)` в `delivery.py`).
+Переписывание sync-библиотек не требуется.
 
 ---
 
@@ -60,10 +62,9 @@ def _get_fernets() -> list[Fernet]:
 
 ---
 
-### 5. Spotify / Last.fm: глобальные httpx-клиенты без proper lifecycle
-**Файлы:** `app/services/spotify.py:27-53`, `app/services/lastfm.py:23-49`  
-**Проблема:** Глобальные синглтоны — сложно тестировать, нет graceful shutdown при падении процесса до `shutdown_resources()`.  
-**Исправление:** Перенести в `lifespan` FastAPI или DI через `HttpClientManager` с `@asynccontextmanager`.
+### 5. Spotify / Last.fm: глобальные httpx-клиенты — ❌ ОТКЛОНЕНО
+Синглтоны корректно закрываются в `shutdown_resources()`, тесты идут через моки.
+Выгоды от DI-менеджера нет, риск регрессии есть.
 
 ---
 
@@ -76,10 +77,9 @@ def _get_fernets() -> list[Fernet]:
 
 ## 🟠 Предупреждения (требуют внимания до релиза)
 
-### 7. Yandex / YouTube / Last.fm: нет retry transport для HTTP-клиентов
-**Файлы:** `app/services/yandex.py`, `app/services/youtube.py`, `app/services/lastfm.py`  
-Только у Spotify есть `create_retry_transport()` + circuit breaker. Остальные — голые вызовы без ретраев на 429/5xx.  
-**Исправление:** Добавить retry transport везде, где есть `httpx.AsyncClient`.
+### 7. Retry transport — ❌ ОТКЛОНЕНО (уже есть)
+Last.fm уже использует `create_retry_transport()`; yandex-music/yt-dlp/ytmusicapi —
+sync-библиотеки без httpx, ретраи там неприменимы (покрыты circuit breaker).
 
 ---
 
@@ -124,10 +124,9 @@ POSTGRES_PASSWORD: playmystation  # Хардкод
 
 ---
 
-### 13. Yandex токен в чате (`/yandex <token>`) — риск утечки в логах Telegram
-**Файл:** `app/bot/handlers/yandex_auth.py:32-82`  
-Сообщение с токеном видно до удаления, в логах Telegram серверов.  
-**Исправление:** Требовать отправку в личку боту, использовать WebApp для ввода токена.
+### 13. Yandex токен в чате — ⚠️ ПРИНЯТЫЙ РИСК
+Удаление best-effort уже есть; WebApp-ввод — большой UX-проект без явного выигрыша
+(секрет живёт в чате секунды). Оставлено как есть осознанно.
 
 ---
 
@@ -145,10 +144,9 @@ POSTGRES_PASSWORD: playmystation  # Хардкод
 
 ---
 
-### 16. Cross-platform матчинг: `pick_by_duration` может вернуть не тот трек (кавер/лайв)
-**Файл:** `app/services/crosslink.py:40-60`  
-Совпадение только по длительности (±7с) — кавер/remix с той же длительностью пройдёт.  
-**Рекомендация:** Добавить fuzzy matching по артисту/названию (Levenshtein) + ISRC если доступен.
+### 16. Cross-platform матчинг mismatch — ⚠️ ПРИНЯТЫЙ ТРЕЙДОФФ
+Проверка длительности ±7с + документированный риск в README. Fuzzy-matching
+даст мало: у кандидатов нет имён артистов для сравнения (только URL+длительность).
 
 ---
 
@@ -168,10 +166,9 @@ POSTGRES_PASSWORD: playmystation  # Хардкод
 
 ---
 
-### 19. Кэш `now_playing` в Redis: сериализация через `__dict__` + `default=str`
-**Файл:** `app/core/redis.py:53-63`  
-Хрупко при изменении `TrackDTO`.  
-**Исправление:** `dataclasses.asdict(track)` или `model_dump()`.
+### 19. Кэш `now_playing` — ❌ ОТКЛОНЕНО (уже `asdict`)
+Проверка `redis.py`: сериализация уже идёт через `dataclasses.asdict(track)`.
+Пункт устарел.
 
 ---
 
@@ -189,13 +186,9 @@ POSTGRES_PASSWORD: playmystation  # Хардкод
 
 ---
 
-### 22. Алембик миграции в `.gitignore` — не попадают в репозиторий
-**Файл:** `.gitignore:6`  
-```gitignore
-alembic/versions/*.py
-```
-На другом окружении `alembic upgrade head` не сработает.  
-**Исправление:** Убрать из `.gitignore`.
+### 22. Миграции в `.gitignore` — ❌ ОТКЛОНЕНО (ложное срабатывание)
+Проверка `.gitignore`: исключений для `alembic/versions` нет, миграции коммитятся
+(последняя `e7a3c5d19f42` применена на проде — видно в логах).
 
 ---
 
@@ -251,10 +244,10 @@ alembic/versions/*.py
 
 | Приоритет | Задачи |
 |-----------|--------|
-| **P0 — Срочно (сегодня)** | #1, #2, #3, #4, #5, #6 |
-| **P1 — На этой неделе** | #7, #8, #9, #10, #11, #12, #13, #14, #15 |
-| **P2 — В спринте** | #16, #17, #18, #19, #20, #21, #22 |
-| **P3 — Техдолг** | #23, #24, #25, #26, #27, #28, #29, #30 |
+| **P0 — Срочно (сегодня)** | #1 ✅, #2 ❌, #3 ⚠️, #4 ✅, #5 ❌, #6 ✅ |
+| **P1 — На этой неделе** | #7 ❌, #8 ✅, #9 ✅, #10 ✅, #11 ✅, #12 ✅, #13 ⚠️, #14 ✅, #15 ✅ |
+| **P2 — В спринте** | #16 ⚠️, #17 ✅, #18 ✅, #19 ❌, #20 ✅, #21 ✅, #22 ❌ |
+| **P3 — Техдолг** | #23 ✅ (pre-commit config), #24 ✅, #25 ✅, #26 ✅, #27 ✅ (dependabot), #28 отложено (mypy — отдельный заход), #29 отложено (Go-sidecar observability), #30 ✅ (webhook secret-тесты) |
 
 ---
 
