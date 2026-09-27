@@ -24,4 +24,8 @@ COPY app ./app
 
 RUN pip install --no-cache-dir -e . && pip install --no-cache-dir asyncpg uvicorn[standard]
 
+# Не запускаем приложение от root (#11).
+RUN useradd -m appuser && chown -R appuser:appuser /code
+USER appuser
+
 CMD ["python", "-m", "app.main"]

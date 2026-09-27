@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     spotify_redirect_uri: str = Field(
         default="http://localhost:8000/oauth/spotify/callback", alias="SPOTIFY_REDIRECT_URI"
     )
+    spotify_scopes: str = Field(
+        default=(
+            "user-read-currently-playing user-read-playback-state user-read-recently-played "
+            "user-modify-playback-state user-library-modify"
+        ),
+        alias="SPOTIFY_SCOPES",
+    )
 
     # Last.fm: только API-ключ сервера + username юзера (OAuth не нужен)
     lastfm_api_key: str = Field(default="", alias="LASTFM_API_KEY")

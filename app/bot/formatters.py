@@ -16,7 +16,7 @@ EMPTY = "─"
 
 def progress_bar(progress_ms: int | None, duration_ms: int | None) -> str:
     # Тонкий бар с knob'ом как в Spotify; цифры elapsed/-remaining несут инфо.
-    if not progress_ms or not duration_ms or duration_ms <= 0:
+    if progress_ms is None or not duration_ms or duration_ms <= 0:
         return ""
     ratio = max(0.0, min(1.0, progress_ms / duration_ms))
     filled = int(ratio * BAR_LEN)

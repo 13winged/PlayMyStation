@@ -27,6 +27,7 @@ SEARCH_TIMEOUT = 10.0
 # Spotify client-credentials токен (общий для всех поисков, кеш в памяти).
 _spotify_token: str | None = None
 _spotify_expiry: float = 0.0
+_spotify_client_id_used: str | None = None
 _spotify_lock = asyncio.Lock()
 
 
@@ -62,13 +63,16 @@ def pick_by_duration(
 
 async def _spotify_app_token() -> str | None:
     """App-токен Spotify (client credentials). None если ключей нет."""
-    global _spotify_token, _spotify_expiry
+    global _spotify_token, _spotify_expiry, _spotify_client_id_used
     from app.core.config import get_settings
 
     settings = get_settings()
     if not settings.spotify_client_id or not settings.spotify_client_secret:
         return None
     async with _spotify_lock:
+        # Ключи сменились (ротация) — старый токен невалиден, берём заново.
+        if settings.spotify_client_id != _spotify_client_id_used:
+            _spotify_token, _spotify_expiry = None, 0.0
         if _spotify_token and time.time() < _spotify_expiry - 60:
             return _spotify_token
         basic = base64.b64encode(
@@ -88,6 +92,7 @@ async def _spotify_app_token() -> str | None:
         data = resp.json()
         _spotify_token = data.get("access_token")
         _spotify_expiry = time.time() + int(data.get("expires_in", 3600))
+        _spotify_client_id_used = settings.spotify_client_id
         return _spotify_token
 
 

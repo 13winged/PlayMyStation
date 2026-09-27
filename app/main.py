@@ -136,25 +136,24 @@ async def delete_webhook(bot: Bot) -> None:
     log.info("Webhook deleted")
 
 
-async def run_polling(bot: Bot, dp: Dispatcher) -> None:
-    """Запуск бота в режиме polling."""
-    log.info("Starting bot in POLLING mode")
-    # Если раньше стоял webhook — снимаем, иначе Telegram продолжит слать
-    # апдейты на URL вместо выдачи через getUpdates.
-    await bot.delete_webhook(drop_pending_updates=True)
-    await get_redis()
-    await dp.start_polling(bot)
+def validate_settings() -> None:
+    """Fail-fast проверка критичных настроек до старта (ясные ошибки вместо тихих)."""
+    settings = get_settings()
+    if not settings.bot_token or ":" not in settings.bot_token:
+        raise RuntimeError("BOT_TOKEN is missing or malformed")
+    try:
+        from app.core.security import _primary
+
+        _primary()
+    except RuntimeError as e:
+        raise RuntimeError(f"Bad FERNET_KEY: {e}") from e
+    if settings.use_webhook and not settings.webhook_secret:
+        raise RuntimeError("WEBHOOK_SECRET is required in webhook mode")
+    if settings.use_webhook and not settings.webhook_url.startswith("https://"):
+        raise RuntimeError("WEBHOOK_URL must be https://")
 
 
-async def run_webhook_mode(bot: Bot, dp: Dispatcher) -> None:
-    """Запуск бота в режиме webhook (polling не запускаем, просто держим процесс)."""
-    log.info("Starting bot in WEBHOOK mode")
-    await get_redis()
-    await setup_webhook(bot)
-
-    # Держим процесс живым, ждём сигнал завершения
-    stop_event = asyncio.Event()
-
+def _install_signal_handlers(stop_event: asyncio.Event) -> None:
     def _signal_handler() -> None:
         log.info("Received shutdown signal")
         stop_event.set()
@@ -164,6 +163,27 @@ async def run_webhook_mode(bot: Bot, dp: Dispatcher) -> None:
         with suppress(NotImplementedError):
             loop.add_signal_handler(sig, _signal_handler)
 
+
+async def run_polling(bot: Bot, dp: Dispatcher, stop_event: asyncio.Event) -> None:
+    """Запуск бота в режиме polling (останавливается по stop_event)."""
+    log.info("Starting bot in POLLING mode")
+    # Если раньше стоял webhook — снимаем, иначе Telegram продолжит слать
+    # апдейты на URL вместо выдачи через getUpdates.
+    await bot.delete_webhook(drop_pending_updates=True)
+    await get_redis()
+    polling = asyncio.create_task(dp.start_polling(bot))
+    await stop_event.wait()
+    log.info("Stopping polling...")
+    polling.cancel()
+    with suppress(asyncio.CancelledError):
+        await polling
+
+
+async def run_webhook_mode(bot: Bot, dp: Dispatcher, stop_event: asyncio.Event) -> None:
+    """Запуск бота в режиме webhook (polling не запускаем, просто держим процесс)."""
+    log.info("Starting bot in WEBHOOK mode")
+    await get_redis()
+    await setup_webhook(bot)
     await stop_event.wait()
     log.info("Shutdown signal received, stopping...")
 
@@ -199,6 +219,7 @@ async def main() -> None:
     await init_db()
     setup_logging()  # Alembic снёс хендлеры root-логгера — восстанавливаем
     init_sentry()  # no-op без SENTRY_DSN
+    validate_settings()  # fail-fast вместо тихих полузапусков
 
     settings = get_settings()
     bot = Bot(
@@ -212,17 +233,19 @@ async def main() -> None:
     set_webhook_dispatcher(dp)
     await setup_bot_meta(bot)
 
+    stop_event = asyncio.Event()
+    _install_signal_handlers(stop_event)
     try:
         if settings.use_webhook:
             # Webhook mode: webhook server + web server
             await asyncio.gather(
-                run_webhook_mode(bot, dp),
+                run_webhook_mode(bot, dp, stop_event),
                 run_web_server(),
             )
         else:
             # Polling mode: polling + web server
             await asyncio.gather(
-                run_polling(bot, dp),
+                run_polling(bot, dp, stop_event),
                 run_web_server(),
             )
     except asyncio.CancelledError:

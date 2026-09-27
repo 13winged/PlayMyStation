@@ -28,11 +28,10 @@ def test_progress_bar_full() -> None:
 
 
 def test_progress_bar_zero() -> None:
-    # progress_ms=0 считается falsy, поэтому возвращается пустая строка
-    assert progress_bar(0, 180_000) == ""
-    # но маленькое положительное значение даёт бар
-    bar = progress_bar(1, 180_000)
+    # progress_ms=0 — начало трека: бар с knob'ом в нуле, а не пусто
+    bar = progress_bar(0, 180_000)
     assert bar.startswith("<code>●")
+    assert progress_bar(None, 180_000) == ""
 
 
 def test_track_card_spotify() -> None:

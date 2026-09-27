@@ -70,3 +70,43 @@ def test_init_sentry_noop_without_dsn() -> None:
     from app.core.observability import init_sentry
 
     assert init_sentry() is False
+
+
+def _webhook_settings():
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        use_webhook=True,
+        webhook_secret="s3cr3t",
+        webhook_path="/webhook",
+    )
+
+
+def test_webhook_rejects_missing_secret() -> None:
+    from unittest.mock import patch
+
+    from fastapi.testclient import TestClient
+
+    from app.web.app import create_web_app
+
+    with patch("app.web.app.get_settings", return_value=_webhook_settings()):
+        client = TestClient(create_web_app(), raise_server_exceptions=False)
+        resp = client.post("/webhook", json={"update_id": 1})
+        assert resp.status_code == 403
+
+
+def test_webhook_rejects_wrong_secret() -> None:
+    from unittest.mock import patch
+
+    from fastapi.testclient import TestClient
+
+    from app.web.app import create_web_app
+
+    with patch("app.web.app.get_settings", return_value=_webhook_settings()):
+        client = TestClient(create_web_app(), raise_server_exceptions=False)
+        resp = client.post(
+            "/webhook",
+            json={"update_id": 1},
+            headers={"X-Telegram-Bot-Api-Secret-Token": "wrong"},
+        )
+        assert resp.status_code == 403

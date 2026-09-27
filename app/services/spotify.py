@@ -53,13 +53,7 @@ async def close_spotify_client() -> None:
             _spotify_client = None
 
 
-def build_authorize_url(
-    telegram_id: int,
-    scopes: str = (
-        "user-read-currently-playing user-read-playback-state user-read-recently-played "
-        "user-modify-playback-state user-library-modify"
-    ),
-) -> str:
+def build_authorize_url(telegram_id: int, scopes: str | None = None) -> str:
     """Ссылка авторизации Spotify. state позже заменится на CSRF-токен (см. ниже)."""
     s = get_settings()
     from urllib.parse import urlencode
@@ -67,20 +61,14 @@ def build_authorize_url(
     params = {
         "response_type": "code",
         "client_id": s.spotify_client_id,
-        "scope": scopes,
+        "scope": scopes or s.spotify_scopes,
         "redirect_uri": s.spotify_redirect_uri,
         "state": str(telegram_id),
     }
     return "https://accounts.spotify.com/authorize?" + urlencode(params)
 
 
-async def build_authorize_url_secure(
-    telegram_id: int,
-    scopes: str = (
-        "user-read-currently-playing user-read-playback-state user-read-recently-played "
-        "user-modify-playback-state user-library-modify"
-    ),
-) -> str:
+async def build_authorize_url_secure(telegram_id: int, scopes: str | None = None) -> str:
     """Ссылка авторизации с одноразовым CSRF-токеном в state (Redis, TTL 15 мин)."""
     import secrets
 
@@ -94,7 +82,7 @@ async def build_authorize_url_secure(
     params = {
         "response_type": "code",
         "client_id": s.spotify_client_id,
-        "scope": scopes,
+        "scope": scopes or s.spotify_scopes,
         "redirect_uri": s.spotify_redirect_uri,
         "state": f"{telegram_id}:{token}",
     }

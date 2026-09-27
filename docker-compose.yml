@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: playmystation
-      POSTGRES_PASSWORD: playmystation
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-playmystation}
       POSTGRES_DB: playmystation
     volumes:
       - pgdata:/var/lib/postgresql/data
