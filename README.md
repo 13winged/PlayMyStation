@@ -1,32 +1,32 @@
 # 🎵 PlayMyStation
 
-Асинхронный мультиаккаунтный Telegram-бот: **Spotify + Яндекс Музыка + YouTube Music + Last.fm** в одном `/now` — карточка трека, аудио рядом, кнопки управления.
+> 🇷🇺 Русская версия: [README_RU.md](./README_RU.md)
 
-## Возможности
+Async multi-account Telegram bot: **Spotify + Yandex Music + YouTube Music + Last.fm** in a single `/now` — track card, audio attached, playback controls.
 
-- `/now` (`/np`) — что играет: опрос активного сервиса или всех сразу (режим ALL, приоритет реально играющему), карточка в духе Spotify-плеера + аудио следом
-- Кнопки под карточкой: ⏸/▶️/⏭/⏮/❤️ для Spotify, «этот же трек на …» (кросс-матчинг), «⏬ Превью», «Мои сервисы»
-- Ссылки из чата (и групп): ссылка на трек Spotify/Яндекс/YouTube → карточка + аудио
-- `/services` — подключение до 4 аккаунтов, выбор активного; команды `/spotify /yandex /youtube /lastfm` переключают режим, если сервис привязан
-- Ссылки на треки Spotify/Яндекс/YouTube прямо из чата и групп → карточка + аудио
-- `/lang` — RU/EN, `/disconnect` — отвязка
-- Метрики Prometheus (`/metrics`), пробы `/health` + `/ready`, Sentry опционально
+## Features
 
-## Стек
+- `/now` (`/np`) — what's playing: polls the active service or all at once (ALL mode, priority to the actually-playing track), Spotify-style card + audio follows
+- Buttons under the card: ⏸/▶️/⏭/⏮/❤️ for Spotify, "same track on …" (cross-matching), "⏬ Preview", "My services"
+- Track links from chat and groups (Spotify/Yandex/YouTube) → card + audio
+- `/services` — connect up to 4 accounts, pick the active one; `/spotify /yandex /youtube /lastfm` switch mode if the service is bound
+- `/lang` — RU/EN, `/disconnect` — unlink
+
+## Stack
 
 Python 3.11+ · aiogram 3.x · FastAPI · SQLAlchemy 2.0 Async + PostgreSQL · Redis ·
 httpx · yandex-music · ytmusicapi · yt-dlp · Docker Compose
 
-## Быстрый старт (локально)
+## Quick start (local)
 
 ```bash
-cp .env.example .env        # заполнить BOT_TOKEN, FERNET_KEY
+cp .env.example .env        # fill in BOT_TOKEN, FERNET_KEY
 docker compose up --build
-# бот: polling (или webhook, если задан WEBHOOK_URL); web: http://localhost:8000/health
-# Миграции Alembic применяются сами при старте
+# bot: polling (or webhook if WEBHOOK_URL is set); web: http://localhost:8000/health
+# Alembic migrations apply automatically on startup
 ```
 
-Без Docker:
+Without Docker:
 
 ```bash
 python -m venv .venv && .venv\Scripts\activate
@@ -34,37 +34,37 @@ pip install -e .[dev]
 python -m app.main
 ```
 
-Тесты: `python -m pytest -q` (200), линтер: `ruff check app tests`.
+Tests: `python -m pytest -q` (200), linter: `ruff check app tests`.
 
-## Провайдеры (честно)
+## Providers (honest)
 
-| Провайдер | Сейчас играет | Аудио | Привязка |
+| Provider | Now playing | Audio | Binding |
 |---|---|---|---|
-| Spotify | realtime API (нужен Premium владельца приложения, иначе 403) | полный через YouTube-матчинг, фолбэк 30-сек preview | OAuth |
-| Яндекс Музыка | realtime (Ynison) / очередь | полный трек | токен |
-| YouTube Music | история | полный трек | OAuth device-flow / заголовки |
-| Last.fm | скроббл (`nowplaying`) | через YouTube-матчинг | username |
+| Spotify | realtime API (requires Premium on the app-owner account, otherwise 403) | full track via YouTube matching, 30-sec preview fallback | OAuth |
+| Yandex Music | realtime (Ynison) / queue | full track | token |
+| YouTube Music | history | full track | OAuth device-flow / headers |
+| Last.fm | scrobble (`nowplaying`) | via YouTube matching | username |
 
-Подробности ограничений — в [гайде по серверу](./README_FOR_YOUR_SERVER.md).
+## Architecture (brief)
 
-## Архитектура (кратко)
+- `app/services/` — provider strategies (`BaseMusicService` + `TrackDTO`), factory with ALL mode, bulkhead timeouts, circuit breakers
+- `app/services/ynison/` + `ynison-proxy/` — Yandex Music realtime (gRPC + Go sidecar)
+- `app/bot/` — handlers, keyboards, `track_card()`, RU/EN (`i18n.py`), audio delivery (`delivery.py`)
+- `app/web/` — FastAPI: Spotify OAuth callback (CSRF state), `/health`, `/ready`, `/metrics`, Telegram webhook (secret required)
+- `app/core/` — config, DB, Redis, retry, metrics, Sentry/structlog, token encryption (Fernet + rotation), audit log
 
-- `app/services/` — стратегии провайдеров (`BaseMusicService` + `TrackDTO`), фабрика с ALL-режимом, bulkhead-таймауты, circuit breakers
-- `app/services/ynison/` + `ynison-proxy/` — realtime Яндекс Музыки (gRPC + Go-сайдкар)
-- `app/bot/` — хендлеры, клавиатуры, `track_card()`, RU/EN (`i18n.py`), доставка аудио (`delivery.py`)
-- `app/web/` — FastAPI: OAuth-callback Spotify (CSRF-state), `/health`, `/ready`, `/metrics`, Telegram webhook (секрет обязателен)
-- `app/core/` — конфиг, БД, Redis, retry, метрики, Sentry/structlog, шифрование токенов (Fernet + ротация), audit-log
+## Docs
 
-## Документы
-
-- [README_FOR_YOUR_SERVER.md](./README_FOR_YOUR_SERVER.md) — поднятие у себя: сервер, OAuth-приложения, деплой, бэкапы, мониторинг, troubleshooting
-- [ROADMAP.md](./ROADMAP.md) — карта разработки
-- [`.env.example`](./.env.example) — все переменные с комментариями
+- [README_FOR_YOUR_SERVER.md](./README_FOR_YOUR_SERVER.md) — self-hosting (Russian): server, OAuth apps, deploy, backups, monitoring, troubleshooting
+- [ROADMAP.md](./ROADMAP.md) — development map (Russian)
+- [ROADMAP_DISCORD.md](./ROADMAP_DISCORD.md) — Discord mirror plan (Russian)
+- [`.env.example`](./.env.example) — all variables with comments
 - [LICENSE](./LICENSE) — Apache-2.0
 
-## Вдохновлено
+## Inspired by
 
-Архитектурный ориентир — [es3n1n/nowplaying](https://github.com/es3n1n/nowplaying)
-(`playinnowbot`, Apache-2.0): идеи флагов возможностей, Last.fm как источника,
-Ynison-realtime и кеша аудио. Go-прокси `ynison-proxy/` и protobuf-модули
-спортированы дословно (Apache-2.0, с указанием авторства), остальное — свой код.
+Architecture reference — [es3n1n/nowplaying](https://github.com/es3n1n/nowplaying)
+(`playinnowbot`, Apache-2.0): capability-flag ideas, Last.fm as a source,
+Ynison realtime and audio cache. The Go proxy `ynison-proxy/` and protobuf
+modules are ported verbatim (Apache-2.0, with attribution); the rest is
+original code.
