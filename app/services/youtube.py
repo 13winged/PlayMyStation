@@ -211,6 +211,15 @@ class _YtDlpLogger:
         log.warning("yt-dlp [%s] ERROR: %s", self._video_id, msg)
 
 
+def player_clients(has_cookie: bool) -> list[str]:
+    """Player-клиенты YouTube под ситуацию.
+
+    С куками: tv + web (android скипается самим yt-dlp при куках).
+    Без кук: android первым — обходит 'Sign in to confirm you're not a bot'.
+    """
+    return ["tv", "web"] if has_cookie else ["android", "web"]
+
+
 def _download_youtube_sync(
     video_id: str, cookie_header: str | None = None
 ) -> tuple[bytes, str] | None:
@@ -232,9 +241,7 @@ def _download_youtube_sync(
             "noplaylist": True,
             "max_filesize": MAX_TRACK_BYTES,
             "logger": _YtDlpLogger(video_id),
-            # Android-клиент обходит "Sign in to confirm you're not a bot"
-            # (проверки бьют в основном по WEB-клиентам); web — фолбэк.
-            "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+            "extractor_args": {"youtube": {"player_client": player_clients(bool(cookie_header))}},
         }
         if cookie_header:
             cookie_file = os.path.join(workdir, "cookies.txt")

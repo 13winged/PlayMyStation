@@ -74,6 +74,15 @@ def test_extract_cookie() -> None:
     assert extract_cookie("[1]") is None
 
 
+def test_player_clients() -> None:
+    from app.services.youtube import player_clients
+
+    # С куками android бесполезен (yt-dlp его скипает) — tv + web.
+    assert player_clients(True) == ["tv", "web"]
+    # Без кук android первым — обход bot-check.
+    assert player_clients(False) == ["android", "web"]
+
+
 def test_cookie_header_to_netscape_format() -> None:
     out = cookie_header_to_netscape("SID=aaa; __Secure-3PAPISID=bbb; broken; =x")
     lines = out.strip().split("\n")
