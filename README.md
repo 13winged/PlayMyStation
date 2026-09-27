@@ -91,7 +91,7 @@ PUBLIC_BASE_URL=https://<DOMAIN>
 WEB_HOST=0.0.0.0
 WEB_PORT=8000
 # Webhook-режим (опционально; без WEBHOOK_URL бот работает в polling-режиме):
-WEBHOOK_URL=https://<DOMAIN>/webhook
+WEBHOOK_URL=https://<DOMAIN>  # без пути — WEBHOOK_PATH добавится сам
 WEBHOOK_SECRET=<случайная строка 32+ символов>
 WEBHOOK_PATH=/webhook
 ```

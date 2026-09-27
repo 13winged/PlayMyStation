@@ -101,7 +101,9 @@ async def setup_webhook(bot: Bot) -> None:
     if not settings.use_webhook:
         return
 
-    webhook_url = f"{settings.webhook_url.rstrip('/')}{settings.webhook_path}"
+    base = settings.webhook_url.rstrip("/")
+    # Не дублируем путь, если он уже в конце URL.
+    webhook_url = base if base.endswith(settings.webhook_path) else base + settings.webhook_path
     log.info("Setting webhook: %s", webhook_url)
 
     await bot.set_webhook(
