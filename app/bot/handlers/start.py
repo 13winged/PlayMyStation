@@ -7,6 +7,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.editing import edit_caption_safe, edit_markup_safe, edit_text_safe
 from app.bot.i18n import lang_of, t
 from app.bot.keyboards import connect_kb, services_kb
 from app.core.redis import invalidate_now_playing_cache
@@ -93,12 +94,12 @@ async def cb_back(cb: CallbackQuery, session: AsyncSession, db_user: User) -> No
     bound, active = _bound_and_active(db_user, integrations)
     # Сообщение может быть с фото (caption) или текстовым (text)
     if cb.message.photo:
-        await cb.message.edit_caption(
-            t(lang, "services_title"), reply_markup=services_kb(bound, active, lang)
+        await edit_caption_safe(
+            cb.message, t(lang, "services_title"), reply_markup=services_kb(bound, active, lang)
         )
     else:
-        await cb.message.edit_text(
-            t(lang, "services_title"), reply_markup=services_kb(bound, active, lang)
+        await edit_text_safe(
+            cb.message, t(lang, "services_title"), reply_markup=services_kb(bound, active, lang)
         )
     await cb.answer()
 
@@ -111,7 +112,7 @@ async def cb_set_active(cb: CallbackQuery, session: AsyncSession, db_user: User)
     await session.commit()
     integrations = await repo.list_integrations(session, db_user.id)
     bound, _ = _bound_and_active(db_user, integrations)
-    await cb.message.edit_reply_markup(reply_markup=services_kb(bound, provider, lang))
+    await edit_markup_safe(cb, services_kb(bound, provider, lang))
     await cb.answer(t(lang, "set_active_answer", provider=provider.upper()))
 
 
@@ -141,14 +142,14 @@ async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> 
         await cb.answer(t(lang, "toggle_off_answer", provider=provider))
         integrations = await repo.list_integrations(session, db_user.id)
         bound, active = _bound_and_active(db_user, integrations)
-        await cb.message.edit_reply_markup(reply_markup=services_kb(bound, active, lang))
+        await edit_markup_safe(cb, services_kb(bound, active, lang))
         return
 
     # Подключаем - используем edit_caption для фото, edit_text для текста
     async def _edit_msg(text: str, markup=None):
         if cb.message.photo:
-            return await cb.message.edit_caption(text, reply_markup=markup)
-        return await cb.message.edit_text(text, reply_markup=markup)
+            return await edit_caption_safe(cb.message, text, reply_markup=markup)
+        return await edit_text_safe(cb.message, text, reply_markup=markup)
 
     if provider == "spotify":
         url = sp_auth_url(state=str(cb.from_user.id))

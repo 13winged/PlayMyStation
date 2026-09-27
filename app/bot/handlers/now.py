@@ -17,6 +17,7 @@ from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.delivery import fetch_and_send
+from app.bot.editing import edit_markup_safe
 from app.bot.formatters import track_card
 from app.bot.i18n import lang_of, t
 from app.bot.keyboards import now_empty_kb, track_kb
@@ -70,14 +71,15 @@ async def _add_platform_buttons(
     if not links:
         return
     try:
-        await sent.edit_reply_markup(
-            reply_markup=track_kb(
+        await edit_markup_safe(
+            sent,
+            track_kb(
                 bool(track.preview_url),
                 links,
                 lang,
                 controls=(track.provider == "spotify"),
                 playing=track.is_playing,
-            )
+            ),
         )
     except TelegramAPIError:
         log.info("platform buttons edit failed (message gone?)")

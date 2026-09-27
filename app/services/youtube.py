@@ -195,6 +195,22 @@ async def youtube_video_meta(video_id: str) -> TrackDTO | None:
     )
 
 
+class _YtDlpLogger:
+    """Проброс ошибок yt-dlp в наш лог (иначе фейлы молчаливые)."""
+
+    def __init__(self, video_id: str) -> None:
+        self._video_id = video_id
+
+    def debug(self, msg: str) -> None:
+        pass
+
+    def warning(self, msg: str) -> None:
+        log.info("yt-dlp [%s]: %s", self._video_id, msg)
+
+    def error(self, msg: str) -> None:
+        log.warning("yt-dlp [%s] ERROR: %s", self._video_id, msg)
+
+
 def _download_youtube_sync(
     video_id: str, cookie_header: str | None = None
 ) -> tuple[bytes, str] | None:
@@ -215,6 +231,7 @@ def _download_youtube_sync(
             "no_warnings": True,
             "noplaylist": True,
             "max_filesize": MAX_TRACK_BYTES,
+            "logger": _YtDlpLogger(video_id),
             # Android-клиент обходит "Sign in to confirm you're not a bot"
             # (проверки бьют в основном по WEB-клиентам); web — фолбэк.
             "extractor_args": {"youtube": {"player_client": ["android", "web"]}},

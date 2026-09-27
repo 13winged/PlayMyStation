@@ -7,6 +7,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.editing import edit_text_safe
 from app.bot.i18n import lang_of, t
 from app.db import repositories as repo
 from app.db.models import User
@@ -41,5 +42,5 @@ async def cb_lang(cb: CallbackQuery, session: AsyncSession, db_user: User) -> No
     await repo.set_language(session, db_user, new_lang)
     await session.commit()
     # Отвечаем уже на новом языке, клавиатуру убираем.
-    await cb.message.edit_text(t(new_lang, "lang_set", language=new_lang.upper()))
+    await edit_text_safe(cb.message, t(new_lang, "lang_set", language=new_lang.upper()))
     await cb.answer()
