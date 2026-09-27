@@ -47,6 +47,9 @@ async def spotify_callback(code: str = Query(), state: str = Query()) -> dict:
             refresh_token=data.get("refresh_token"),
             expires_at=expires_at,
         )
+        await repo.log_audit(
+            session, user.id, telegram_id, "connect", "spotify", "oauth callback"
+        )
         await session.commit()
     return {
         "ok": True,

@@ -54,6 +54,13 @@ now_playing_cache_total = Counter(
     ["result"],
 )
 
+# ----- Audit -----
+audit_total = Counter(
+    "pms_audit_total",
+    "События подключения/отключения провайдеров.",
+    ["action", "provider"],
+)
+
 # ----- HTTP (FastAPI) -----
 http_requests_total = Counter(
     "pms_http_requests_total",

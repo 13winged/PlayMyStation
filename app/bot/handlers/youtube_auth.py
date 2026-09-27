@@ -89,6 +89,7 @@ async def cmd_youtube(
     await repo.upsert_integration(
         session, user_id=db_user.id, provider="youtube", access_token=auth_json
     )
+    await repo.log_audit(session, db_user.id, db_user.telegram_id, "connect", "youtube", "headers")
     await session.commit()
     await invalidate_now_playing_cache(db_user.telegram_id)
     await message.answer(t(lang, "yt_ok"))
@@ -161,6 +162,9 @@ async def _poll_oauth_flow(
                 user = await repo.get_or_create_user(session, telegram_id)
                 await repo.upsert_integration(
                     session, user_id=user.id, provider="youtube", access_token=token_json
+                )
+                await repo.log_audit(
+                    session, user.id, telegram_id, "connect", "youtube", "oauth device"
                 )
                 await session.commit()
             await delete_pending_youtube_oauth(telegram_id)

@@ -111,8 +111,25 @@ WEBHOOK_PATH=/webhook
 - **Пробы**: `/health` (liveness, всегда 200) и `/ready` (проверяет PostgreSQL
   и Redis, 503 если недоступны) — для Docker healthcheck и балансировщиков.
 
-## Бэкапы
+## Ротация Fernet-ключей
 
+Токены шифруются стеком ключей: `FERNET_KEY` (primary, шифрование) +
+`FERNET_KEYS_OLD` через запятую (только расшифровка). Процедура:
+
+```bash
+# 1. Новый ключ
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# 2. В ENV_PROD: FERNET_KEY=<новый>, FERNET_KEYS_OLD=<старый> → деплой
+# 3. Перешифровать всё новым ключом (отчёт в stdout):
+docker compose exec app python -m app.core.security
+# 4. Убрать FERNET_KEYS_OLD → деплой
+```
+
+Подключения/отключения пишутся в таблицу `audit_log` (без секретов) и в
+метрику `pms_audit_total{action,provider}`. Последние события юзера:
+`recent_audit()` в репозиториях.
+
+## Бэкапы
 Сервис `backup` (образ `postgres:16-alpine`) делает `pg_dump -Fc` ежедневно
 в 03:00 в volume `pgbackups`, ротация — `BACKUP_RETENTION_DAYS` суток (default 7).
 Первый бэкап — сразу при старте/деплоe. Логи: `docker compose logs backup`.

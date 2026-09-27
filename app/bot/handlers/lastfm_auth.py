@@ -71,6 +71,7 @@ async def cmd_lastfm(
         session, user_id=db_user.id, provider="lastfm", access_token=None,
         service_user_id=username,
     )
+    await repo.log_audit(session, db_user.id, db_user.telegram_id, "connect", "lastfm", username)
     await session.commit()
     await invalidate_now_playing_cache(db_user.telegram_id)
     await message.answer(

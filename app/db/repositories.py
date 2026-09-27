@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decrypt_token, encrypt_token
-from app.db.models import Integration, User
+from app.db.models import AuditLog, Integration, User
 
 
 # ---------- Users ----------
@@ -101,3 +101,40 @@ def decrypted_access(integration: Integration) -> str | None:
 
 def decrypted_refresh(integration: Integration) -> str | None:
     return decrypt_token(integration.refresh_token)
+
+
+async def log_audit(
+    session: AsyncSession,
+    user_id: int | None,
+    telegram_id: int,
+    action: str,
+    provider: str,
+    detail: str | None = None,
+) -> AuditLog:
+    """Записать событие подключения/отключения. Без секретов в detail!"""
+    from app.core.metrics import audit_total
+
+    row = AuditLog(
+        user_id=user_id,
+        telegram_id=telegram_id,
+        action=action,
+        provider=provider,
+        detail=detail,
+    )
+    session.add(row)
+    await session.flush()
+    audit_total.labels(action, provider).inc()
+    return row
+
+
+async def recent_audit(
+    session: AsyncSession, telegram_id: int, limit: int = 10
+) -> list[AuditLog]:
+    """Последние события юзера (для диагностики)."""
+    res = await session.execute(
+        select(AuditLog)
+        .where(AuditLog.telegram_id == telegram_id)
+        .order_by(AuditLog.id.desc())
+        .limit(limit)
+    )
+    return list(res.scalars().all())

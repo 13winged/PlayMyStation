@@ -47,3 +47,21 @@ class Integration(Base):
     service_user_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="integrations")
+
+
+class AuditLog(Base):
+    """Журнал подключений/отключений (кто, что, когда). Без секретов."""
+
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    action: Mapped[str] = mapped_column(String(20))  # connect | disconnect
+    provider: Mapped[str] = mapped_column(String(20))
+    detail: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
+    )

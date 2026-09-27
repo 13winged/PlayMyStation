@@ -39,7 +39,7 @@
 - [x] CI (ruff/pytest/docker build) + CD на VPS через GitHub Actions (SSH + Deploy Key) + Caddy (https)
 - [x] Метрики Prometheus (`/metrics`: апдейты, провайдеры, кэш, circuit breakers, HTTP) + Sentry (по `SENTRY_DSN`) + structlog (`LOG_FORMAT=json`) + пробы `/health`/`/ready`
 - [x] Бэкапы Postgres (`backup`-сервис: pg_dump daily 03:00, ротация `BACKUP_RETENTION_DAYS`, volume `pgbackups`)
-- [ ] Ротация Fernet-ключей, audit-log подключений
+- [x] Ротация Fernet-ключей (стек `FERNET_KEY` + `FERNET_KEYS_OLD`, `python -m app.core.security`), audit-log подключений (`audit_log` + `pms_audit_total`)
 
 ## Текущий статус прода (2026-09-26)
 - Бот работает в **polling-режиме** (временно).

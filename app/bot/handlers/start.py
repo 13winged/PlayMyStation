@@ -67,6 +67,7 @@ async def cmd_disconnect(
         return
 
     await repo.delete_integration(session, db_user.id, provider)
+    await repo.log_audit(session, db_user.id, db_user.telegram_id, "disconnect", provider, "command")
     await session.commit()
 
     # Если отключали активный провайдер — сбрасываем на "all"
@@ -124,6 +125,9 @@ async def cb_toggle(cb: CallbackQuery, session: AsyncSession, db_user: User) -> 
     if provider in bound:
         # Отключаем
         await repo.delete_integration(session, db_user.id, provider)
+        await repo.log_audit(
+            session, db_user.id, db_user.telegram_id, "disconnect", provider, "button"
+        )
         await session.commit()
 
         # Если отключали активный — сброс на all

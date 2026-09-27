@@ -114,6 +114,7 @@ async def cmd_spotify(
         refresh_token=data.get("refresh_token"),
         expires_at=expires_at,
     )
+    await repo.log_audit(session, db_user.id, db_user.telegram_id, "connect", "spotify", "manual code")
     await session.commit()
     await invalidate_now_playing_cache(db_user.telegram_id)
     await message.answer(t(lang, "sp_ok"))

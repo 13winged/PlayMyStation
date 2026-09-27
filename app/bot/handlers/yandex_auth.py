@@ -69,6 +69,7 @@ async def cmd_yandex(
     await repo.upsert_integration(
         session, user_id=db_user.id, provider="yandex", access_token=token
     )
+    await repo.log_audit(session, db_user.id, db_user.telegram_id, "connect", "yandex", "token")
     await session.commit()
     hint = t(lang, "yx_empty_queue_hint") if probe is None else ""
     await message.answer(

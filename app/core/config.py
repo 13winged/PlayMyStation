@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
 
     fernet_key: str = Field(default="CHANGE_ME", alias="FERNET_KEY")
+    # Старые ключи через запятую — только для чтения при ротации (см. README).
+    fernet_keys_old: str = Field(default="", alias="FERNET_KEYS_OLD")
 
     spotify_client_id: str = Field(default="", alias="SPOTIFY_CLIENT_ID")
     spotify_client_secret: str = Field(default="", alias="SPOTIFY_CLIENT_SECRET")
