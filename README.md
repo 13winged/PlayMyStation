@@ -56,7 +56,7 @@ all automatic, in background, best-effort.
 
 ---
 
-## Providers (honest)
+## Providers
 
 | Provider | Now playing | Audio | Binding |
 |---|---|---|---|
