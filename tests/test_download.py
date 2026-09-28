@@ -1,5 +1,6 @@
 """Тесты докачки аудио: выбор качества, track_id, дефолты (без сети)."""
 
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -12,7 +13,12 @@ from app.services.yandex import (
     candidate_track_ids,
     pick_best_download_info,
 )
-from app.services.youtube import YouTubeMusicService, parse_duration_seconds, pick_match
+from app.services.youtube import (
+    YouTubeMusicService,
+    parse_duration_seconds,
+    pick_match,
+    rank_matches,
+)
 
 
 def _track(provider: str = "yandex", artist: str = "A", title: str = "T", **kw) -> TrackDTO:
@@ -173,6 +179,86 @@ class TestPickMatch:
     def test_unknown_duration_accepts_best(self) -> None:
         cands = [{"videoId": "u", "duration_seconds": None}]
         assert pick_match(cands, 180_000) == "u"
+
+
+class TestRankMatches:
+    def test_orders_by_proximity(self) -> None:
+        cands = [
+            {"videoId": "far", "duration_seconds": 300},
+            {"videoId": "near", "duration_seconds": 215},
+            {"videoId": "near2", "duration_seconds": 210},
+        ]
+        assert rank_matches(cands, 213_000) == ["near", "near2"]
+
+    def test_limit(self) -> None:
+        cands = [{"videoId": f"v{i}", "duration_seconds": 180} for i in range(5)]
+        assert len(rank_matches(cands, 180_000, limit=3)) == 3
+
+    def test_dedupes(self) -> None:
+        cands = [
+            {"videoId": "a", "duration_seconds": 180},
+            {"videoId": "a", "duration_seconds": 180},
+        ]
+        assert rank_matches(cands, 180_000) == ["a"]
+
+    def test_no_expected_keeps_order(self) -> None:
+        cands = [
+            {"videoId": "a", "duration_seconds": 999},
+            {"videoId": "b", "duration_seconds": 111},
+        ]
+        assert rank_matches(cands, None) == ["a", "b"]
+
+
+class TestDownloadCascade:
+    @pytest.mark.asyncio
+    async def test_tries_next_candidate_after_failure(self, monkeypatch) -> None:
+        import app.services.youtube as yt_mod
+        from app.services.youtube import download_by_query
+
+        calls = []
+
+        async def immediate_to_thread(f, *args, **kwargs):
+            return f(*args, **kwargs)
+
+        def fake_download(video_id, cookie):
+            calls.append(video_id)
+            if video_id == "drm":
+                return None  # DRM/недоступно — идём дальше
+            return (b"audio", "m4a")
+
+        monkeypatch.setattr(
+            yt_mod,
+            "_search_candidates_sync",
+            lambda q: [
+                {"videoId": "drm", "duration_seconds": 180},
+                {"videoId": "good", "duration_seconds": 181},
+            ],
+        )
+        monkeypatch.setattr(yt_mod, "_download_youtube_sync", fake_download)
+        # to_thread выполняем синхронно, без пула потоков
+        monkeypatch.setattr(asyncio, "to_thread", immediate_to_thread)
+
+        result = await download_by_query("A - T", 180_000, None)
+        assert result == (b"audio", "m4a")
+        assert calls == ["drm", "good"]
+
+    @pytest.mark.asyncio
+    async def test_all_candidates_failed_returns_none(self, monkeypatch) -> None:
+        import app.services.youtube as yt_mod
+        from app.services.youtube import download_by_query
+
+        async def immediate_to_thread(f, *args, **kwargs):
+            return f(*args, **kwargs)
+
+        monkeypatch.setattr(
+            yt_mod,
+            "_search_candidates_sync",
+            lambda q: [{"videoId": "x", "duration_seconds": 180}],
+        )
+        monkeypatch.setattr(yt_mod, "_download_youtube_sync", lambda *a: None)
+        monkeypatch.setattr(asyncio, "to_thread", immediate_to_thread)
+
+        assert await download_by_query("A - T", 180_000, None) is None
 
 
 class TestAudioCacheKey:

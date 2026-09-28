@@ -358,23 +358,47 @@ def pick_match(
     Без expected — первый кандидат. Вне допуска — None (лучше превью,
     чем чужой трек: кавер/live с тем же названием).
     """
-    if not candidates:
-        return None
-    if not expected_ms:
-        return str(candidates[0]["videoId"])
-    expected = expected_ms / 1000
-    ranked = sorted(
-        candidates,
-        key=lambda c: abs((c.get("duration_seconds") or expected) - expected),
-    )
-    best = ranked[0]
-    best_dur = best.get("duration_seconds")
-    if best_dur is None:
-        return str(best["videoId"])
-    if abs(best_dur - expected) <= tolerance_s:
-        return str(best["videoId"])
-    log.info("no duration match for %.0fs among %d candidates", expected, len(candidates))
-    return None
+    ranked = rank_matches(candidates, expected_ms, tolerance_s, limit=1)
+    return ranked[0] if ranked else None
+
+
+def rank_matches(
+    candidates: list[dict],
+    expected_ms: int | None,
+    tolerance_s: int = 7,
+    limit: int = 3,
+) -> list[str]:
+    """Ранжировать videoId по близости длительности (ближайшие первыми).
+
+    Каскад для докачки: DRM/удалённое видео пропускаем, берём следующее
+    совпадение вместо сдачи. Вне допуска (при известном expected) — отсев.
+    """
+    scored: list[tuple[float, str]] = []
+    expected = expected_ms / 1000 if expected_ms else None
+    for c in candidates:
+        vid = c.get("videoId")
+        if not vid:
+            continue
+        dur = c.get("duration_seconds")
+        if expected is None:
+            scored.append((0.0, str(vid)))
+            continue
+        if dur is None:
+            scored.append((0.0, str(vid)))
+            continue
+        delta = abs(dur - expected)
+        if delta <= tolerance_s:
+            scored.append((delta, str(vid)))
+    scored.sort(key=lambda s: s[0])
+    seen: list[str] = []
+    for _, vid in scored:
+        if vid not in seen:
+            seen.append(vid)
+        if len(seen) >= limit:
+            break
+    if expected is not None and not seen:
+        log.info("no duration match for %.0fs among %d candidates", expected, len(candidates))
+    return seen
 
 
 async def _download_via_streaming(auth_json: str, video_id: str) -> tuple[bytes, str] | None:
@@ -408,25 +432,31 @@ async def download_by_query(
     except Exception:  # noqa: BLE001 — best-effort
         await YOUTUBE_CIRCUIT.record_failure()
         return None
-    video_id = pick_match(candidates, duration_ms)
-    if not video_id:
+    video_ids = rank_matches(candidates, duration_ms)
+    if not video_ids:
         return None
     if youtube_auth and is_oauth_json(youtube_auth):
-        return await _download_via_streaming(youtube_auth, video_id)
+        for video_id in video_ids:
+            result = await _download_via_streaming(youtube_auth, video_id)
+            if result is not None:
+                return result
+        return None
     cookie = extract_cookie(youtube_auth) if youtube_auth else None
-    try:
-        async with asyncio.timeout(110):
-            result = await asyncio.to_thread(_download_youtube_sync, video_id, cookie)
-    except YouTubeAuthExpired:
-        await YOUTUBE_CIRCUIT.record_failure()
-        raise
-    except (TimeoutError, Exception):  # noqa: BLE001 — best-effort докачка
-        await YOUTUBE_CIRCUIT.record_failure()
-        return None
-    if result is None:
-        return None
-    await YOUTUBE_CIRCUIT.record_success()
-    return result
+    for video_id in video_ids:
+        try:
+            async with asyncio.timeout(40):
+                result = await asyncio.to_thread(_download_youtube_sync, video_id, cookie)
+        except YouTubeAuthExpired:
+            await YOUTUBE_CIRCUIT.record_failure()
+            raise
+        except (TimeoutError, Exception):  # noqa: BLE001 — пробуем следующий кандидат
+            log.info("candidate %s failed, trying next", video_id)
+            continue
+        if result is not None:
+            await YOUTUBE_CIRCUIT.record_success()
+            return result
+    await YOUTUBE_CIRCUIT.record_failure()
+    return None
 
 
 class YouTubeMusicService(BaseMusicService):

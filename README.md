@@ -46,7 +46,7 @@ all automatic, in background, best-effort.
 | Area | What |
 |---|---|
 | **`/now` (`/np`)** | Polls the active service — or all at once (ALL mode, priority to the actually-playing track) |
-| **Audio** | Full track follows the card: Yandex direct links, YouTube via `yt-dlp`, Spotify/Last.fm via YouTube matching; `file_id` cache = instant repeats |
+| **Audio** | Full track follows the card: Yandex direct links, YouTube via `yt-dlp`, Spotify/Last.fm via YouTube matching (top-3 cascade past DRM); `file_id` cache = instant repeats |
 | **Controls** | ⏸/▶️/⏭/⏮/❤️ under Spotify cards (Premium + active device required) |
 | **Links** | Track URL pasted in chat or group → card + audio (one job per user) |
 | **Cross-links** | "Same track on …" buttons via native search matching (duration-checked) |
