@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "PlayMyStation — YouTube Music Connect",
+  "version": "0.1.0",
+  "description": "Connect your YouTube Music session to your PlayMyStation bot without DevTools.",
+  "minimum_chrome_version": "120",
+  "permissions": ["storage", "webRequest", "alarms"],
+  "host_permissions": ["https://music.youtube.com/*"],
+  "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
+  "background": {"service_worker": "background.js", "type": "module"},
+  "action": {"default_title": "Connect YouTube Music"}
+}

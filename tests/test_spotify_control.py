@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from app.services.base import BaseMusicService, TrackDTO
-from app.services.spotify import SPOTIFY_CIRCUIT, SpotifyService, build_authorize_url
+from app.services.spotify import SPOTIFY_CIRCUIT, SpotifyService, build_authorize_url_secure
 from tests.test_spotify_fallback import FakeResponse
 
 
@@ -116,11 +116,12 @@ class TestControlCapabilities:
 
 
 class TestControlScopes:
-    def test_authorize_url_requests_control_scopes(self) -> None:
-        url = build_authorize_url(1)
+    async def test_authorize_url_requests_control_scopes(self) -> None:
+        with patch("app.core.redis.save_oauth_state", new_callable=AsyncMock):
+            url = await build_authorize_url_secure(1)
         assert "user-modify-playback-state" in url
         assert "user-library-modify" in url
-        assert "state=1" in url
+        assert "state=1%3A" in url
 
 
 def test_track_kb_controls_row() -> None:

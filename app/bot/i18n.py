@@ -11,6 +11,14 @@ from app.db.models import User
 
 STRINGS: dict[str, dict[str, str]] = {
     "ru": {
+        "yt_extension_private": "Открой личный чат со мной и отправь /youtube_connect.",
+        "yt_extension_code": (
+            "В расширении PlayMyStation укажи сервер:\n<code>{url}</code>\n\n"
+            "Одноразовый код (10 минут):\n<code>{code}</code>\n\n"
+            "Нажми «Подключить» и открой библиотеку YouTube Music в новой вкладке. "
+            "Данные сессии будут переданы этому серверу для доступа к музыке. "
+            "Не передавай код другим людям. После подключения отправь /youtube и /now."
+        ),
         # /start, /services, /disconnect
         "start_text": (
             "👋 <b>PlayMyStation</b>\n\n"
@@ -219,6 +227,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "ctl_no_spotify": "❌ Spotify не подключён. Открой /services.",
     },
     "en": {
+        "yt_extension_private": "Open a private chat with me and send /youtube_connect.",
+        "yt_extension_code": (
+            "Enter this server in the PlayMyStation extension:\n<code>{url}</code>\n\n"
+            "One-time code (10 minutes):\n<code>{code}</code>\n\n"
+            "Click Connect and open your YouTube Music library in the new tab. "
+            "Your session credentials will be sent to this server for music access. "
+            "Do not share the code. Afterwards send /youtube and /now."
+        ),
         "start_text": (
             "👋 <b>PlayMyStation</b>\n\n"
             "Connect up to 4 accounts: Spotify, Yandex Music, YouTube Music and Last.fm.\n"

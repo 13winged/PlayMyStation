@@ -185,12 +185,12 @@ async def consume_oauth_state(token: str) -> int | None:
     """Одноразово забрать telegram_id по state. None если нет/протух."""
     r = await get_redis()
     try:
-        raw = await r.get(_oauth_state_key(token))
+        # GET + DELETE допускают два одновременных потребителя одного state.
+        raw = await r.getdel(_oauth_state_key(token))
     except Exception:  # noqa: BLE001 — best-effort
         return None
     if raw is None:
         return None
-    await r.delete(_oauth_state_key(token))
     try:
         return int(raw)
     except (TypeError, ValueError):

@@ -14,6 +14,7 @@ import json
 import logging
 import time
 import uuid
+from html import escape
 
 from aiogram import Router
 from aiogram.filters import Command, CommandObject
@@ -42,6 +43,24 @@ from app.services.youtube_oauth import (
 router = Router()
 
 log = logging.getLogger("playmystation.youtube_auth")
+
+
+@router.message(Command("youtube_connect"))
+async def cmd_browser_connect(message: Message, db_user: User) -> None:
+    from app.core.config import get_settings
+    from app.services.browser_pairing import issue_code
+
+    lang = lang_of(db_user)
+    # A pairing code authorizes replacement of this user's integration.
+    # Never publish it into a group, even if the bot receives group commands.
+    if message.chat.type != "private":
+        await message.answer(t(lang, "yt_extension_private"))
+        return
+    code = await issue_code(db_user.telegram_id)
+    await message.answer(t(
+        lang, "yt_extension_code", code=code,
+        url=escape(get_settings().public_base_url.rstrip("/")),
+    ))
 
 
 @router.message(Command("youtube", "ytmusic"))

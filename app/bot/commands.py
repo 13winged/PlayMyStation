@@ -22,6 +22,7 @@ BOT_COMMANDS: list[BotCommand] = [
     BotCommand(command="spotify", description="Spotify: выбрать / подключить"),
     BotCommand(command="yandex", description="Яндекс: выбрать / подключить"),
     BotCommand(command="youtube", description="YouTube: выбрать / подключить"),
+    BotCommand(command="youtube_connect", description="YouTube: подключить через расширение"),
     BotCommand(command="lastfm", description="Last.fm: выбрать / подключить"),
     BotCommand(command="lang", description="Язык / Language (RU/EN)"),
     BotCommand(command="disconnect", description="Отключить сервис"),

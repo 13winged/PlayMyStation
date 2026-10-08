@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PlayMyStation — подключение YouTube Music</title>
+  <link rel="stylesheet" href="connect.css">
+</head>
+<body>
+  <main>
+    <p class="brand">PlayMyStation</p>
+    <h1>Подключи YouTube Music</h1>
+    <p>Отправь боту <code>/youtube_connect</code> в личном чате. Скопируй адрес сервера и одноразовый код сюда.</p>
+    <form id="connect">
+      <label for="server">Сервер твоего бота</label>
+      <input id="server" type="url" placeholder="https://music.example.com" required autocomplete="off">
+      <label for="code">Одноразовый код</label>
+      <input id="code" type="password" required autocomplete="off" spellcheck="false">
+      <label class="consent"><input id="consent" type="checkbox" required> Разрешаю передать данные моей сессии YouTube Music указанному серверу. Доверяю его владельцу.</label>
+      <button type="submit">Подключить</button>
+      <button id="cancel" type="button" class="secondary">Остановить</button>
+    </form>
+    <p id="status" role="status" aria-live="polite">После подключения откроется вкладка YouTube Music. Войди в нужный аккаунт и открой библиотеку.</p>
+    <p class="note">Данные дают серверу доступ от твоего имени. Заголовки не сохраняются в расширении. Сбор прекращается после одной передачи или через 10 минут. Для обновления сессии повтори подключение с новым кодом.</p>
+  </main>
+  <script type="module" src="connect.js"></script>
+</body>
+</html>

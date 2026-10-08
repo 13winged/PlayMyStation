@@ -110,6 +110,8 @@ async def cb_set_active(cb: CallbackQuery, session: AsyncSession, db_user: User)
     provider = (cb.data or "").split(":")[-1]
     await repo.set_active_provider(session, db_user, provider)
     await session.commit()
+    # Иначе /now до 20 секунд показывает трек предыдущего сервиса.
+    await invalidate_now_playing_cache(db_user.telegram_id)
     integrations = await repo.list_integrations(session, db_user.id)
     bound, _ = _bound_and_active(db_user, integrations)
     await edit_markup_safe(cb, services_kb(bound, provider, lang))
