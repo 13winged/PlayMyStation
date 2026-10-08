@@ -7,17 +7,39 @@ on:
 jobs:
   lint-test:
     runs-on: ubuntu-latest
+    # SQLite create_all не проверяет реальные PostgreSQL-миграции.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: playmystation
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: playmystation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U playmystation"
+          --health-interval 5s --health-timeout 3s --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install package with dev dependencies
-        run: pip install -e ".[dev]"
+        run: |
+          pip install uv==0.12.23
+          uv sync --locked --extra dev
       - name: Ruff check
-        run: ruff check app tests
+        run: uv run --locked --extra dev ruff check app tests
       - name: Compile check
-        run: python -m compileall -q app
+        run: uv run --locked --extra dev python -m compileall -q app
+      - name: PostgreSQL migrations match models
+        env:
+          BOT_TOKEN: "123456:test"
+          DATABASE_URL: "postgresql+asyncpg://playmystation:test-only@localhost:5432/playmystation"
+        run: |
+          uv run --locked --extra dev alembic upgrade head
+          uv run --locked --extra dev alembic check
       - name: Tests
         env:
           BOT_TOKEN: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
@@ -30,7 +52,7 @@ jobs:
           WEB_HOST: "0.0.0.0"
           WEB_PORT: "8000"
           PUBLIC_BASE_URL: "http://localhost:8000"
-        run: python -m pytest -q
+        run: uv run --locked --extra dev python -m pytest -q
 
   docker-build:
     runs-on: ubuntu-latest

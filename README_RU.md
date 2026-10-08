@@ -94,11 +94,21 @@ docker compose up --build
 
 ```bash
 python -m venv .venv && .venv\Scripts\activate
-pip install -e .[dev]
+pip install uv==0.12.23
+uv sync --locked --extra dev
 python -m app.main
 ```
 
-Тесты: `python -m pytest -q` (200) · Линтер: `ruff check app tests`
+Тесты: `python -m pytest -q` · Линтер: `ruff check app tests`
+
+`uv.lock` фиксирует зависимости для локальной разработки, CI и Docker.
+Обновляйте их явно через `uv lock --upgrade` с последующим запуском тестов.
+Compose публикует порты БД, Redis и API только на localhost; внешний HTTPS
+в продакшене обслуживает Caddy. До создания производственной БД задайте свой
+пароль в `POSTGRES_PASSWORD` и `DATABASE_URL`. Для существующей БД нужно также
+изменить пароль внутри PostgreSQL: одной правки переменных недостаточно.
+Старые ссылки Spotify без случайного state отклоняются: получите новую ссылку
+в боте. Это закрывает возможность привязки аккаунта к чужому Telegram ID.
 
 ---
 

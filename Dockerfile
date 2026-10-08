@@ -17,12 +17,14 @@ RUN mkdir -p /etc/apt/keyrings \
   && apt-get update && apt-get install -y --no-install-recommends nodejs \
   && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml uv.lock README.md ./
 COPY alembic ./alembic
 COPY alembic.ini ./
 COPY app ./app
 
-RUN pip install --no-cache-dir -e . && pip install --no-cache-dir asyncpg uvicorn[standard]
+# Один lock-файл для CI, локальной разработки и контейнера.
+RUN pip install --no-cache-dir uv==0.12.23 && uv sync --locked --no-dev
+ENV PATH="/code/.venv/bin:$PATH"
 
 # Не запускаем приложение от root (#11).
 RUN useradd -m appuser && chown -R appuser:appuser /code

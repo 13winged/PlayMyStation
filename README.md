@@ -94,11 +94,21 @@ Without Docker:
 
 ```bash
 python -m venv .venv && .venv\Scripts\activate
-pip install -e .[dev]
+pip install uv==0.12.23
+uv sync --locked --extra dev
 python -m app.main
 ```
 
-Tests: `python -m pytest -q` (200) · Linter: `ruff check app tests`
+Tests: `python -m pytest -q` · Linter: `ruff check app tests`
+
+`uv.lock` pins dependencies for local development, CI and Docker. Update it
+deliberately with `uv lock --upgrade`, then run tests before deployment.
+Compose publishes database, Redis and API ports on localhost only; production
+HTTPS access goes through Caddy. Set your own PostgreSQL password in both
+`POSTGRES_PASSWORD` and `DATABASE_URL` before initializing a production database.
+Existing databases require an actual database password change as well.
+Old Spotify authorization links without a random state are rejected: request a
+new link from the bot. This prevents linking an account to another Telegram ID.
 
 ---
 

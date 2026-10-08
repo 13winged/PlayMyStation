@@ -2,6 +2,7 @@
 
 import asyncio
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -102,7 +103,31 @@ class TestSpotifyDownload:
     @pytest.mark.asyncio
     async def test_no_preview_no_download(self) -> None:
         svc = SpotifyService("token")
-        assert await svc.download_track(_track("spotify")) is None
+        # Отсутствие preview не исключает YouTube-матчинг. Сеть в unit-тесте запрещена.
+        with patch("app.services.spotify.download_by_query", new_callable=AsyncMock,
+                   return_value=None) as download:
+            assert await svc.download_track(_track("spotify")) is None
+        download.assert_awaited_once()
+
+    async def test_full_track_without_preview(self) -> None:
+        with patch("app.services.spotify.download_by_query", new_callable=AsyncMock,
+                   return_value=(b"full audio", "m4a")):
+            assert await SpotifyService("token").download_track(_track("spotify")) == (
+                b"full audio", "m4a"
+            )
+
+    async def test_preview_when_matching_fails(self) -> None:
+        with (
+            patch("app.services.spotify.download_by_query", new_callable=AsyncMock,
+                  return_value=None),
+            patch("app.services.spotify.fetch_audio_bytes", new_callable=AsyncMock,
+                  return_value=b"preview") as fetch,
+        ):
+            result = await SpotifyService("token").download_track(
+                _track("spotify", preview_url="https://example.com/preview.mp3")
+            )
+        assert result == (b"preview", "mp3")
+        fetch.assert_awaited_once_with("https://example.com/preview.mp3")
 
     @pytest.mark.asyncio
     async def test_yandex_without_track_id_no_download(self) -> None:

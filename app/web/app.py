@@ -64,7 +64,8 @@ def create_web_app() -> FastAPI:
         start = time.perf_counter()
         response = await call_next(request)
         route = request.scope.get("route")
-        path = getattr(route, "path", request.url.path) or request.url.path
+        # Произвольные 404 URL не должны создавать бесконечные серии метрик.
+        path = getattr(route, "path", None) or "__unmatched__"
         duration = time.perf_counter() - start
         http_requests_total.labels(request.method, path, response.status_code).inc()
         http_request_duration_seconds.labels(request.method, path).observe(duration)

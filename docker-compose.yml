@@ -1,3 +1,4 @@
+# Порты доступны только локально; Caddy обращается к app по Docker-сети.
 services:
   postgres:
     image: postgres:16-alpine
@@ -8,12 +9,12 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
 
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
 
   # Go-сайдкар: транспорт для gRPC-стримов нативного протокола
   # Яндекс Музыки (Ynison). Слушает только внутри compose-сети.
@@ -29,7 +30,7 @@ services:
       - postgres
       - redis
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
   # Ежедневный pg_dump в 03:00 + ротация (BACKUP_RETENTION_DAYS, default 7).
   # Первый бэкап — сразу при старте (с ретраями, пока встаёт postgres).

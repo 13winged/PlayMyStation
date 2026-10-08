@@ -106,7 +106,10 @@ async def resolve_now_playing(
     # Проверяем кэш, если передан telegram_id
     if telegram_id is not None:
         cached = await get_cached_now_playing(telegram_id)
-        if cached is not None:
+        # Защита от старого кэша при гонке /now и смены режима/отвязки.
+        bound = {i.provider for i in integrations}
+        if (cached is not None and cached.provider in bound
+                and active_provider in ("all", cached.provider)):
             count_cache("hit")
             return cached
         count_cache("miss")

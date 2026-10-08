@@ -1,6 +1,6 @@
 """FastAPI OAuth-callback для Spotify.
 
-state = telegram_id. После обмена code->token сохраняем интеграцию в БД.
+state = telegram_id:одноразовый_токен. После обмена code->token сохраняем интеграцию в БД.
 (Яндекс, YouTube Music и Last.fm привязываются без OAuth-callback:
 токен/заголовки/username присылаются боту напрямую.)
 """
@@ -22,21 +22,18 @@ router = APIRouter(prefix="/oauth", tags=["oauth"])
 async def _verify_state(state: str) -> int:
     """Проверить одноразовый CSRF-токен (формат 'telegram_id:token').
 
-    Совместимость: голый telegram_id без токена (старые ссылки) — принимаем,
-    но такие ссылки живут вечно, новые всегда с токеном.
+    Legacy ID без токена запрещён: иначе можно привязать чужой Telegram ID.
+    Старую ссылку пользователь должен получить заново через бота.
     """
     from app.core.redis import consume_oauth_state
 
-    if ":" in state:
-        prefix, _, token = state.partition(":")
-        stored = await consume_oauth_state(token)
-        if stored is None or str(stored) != prefix:
-            raise HTTPException(400, "Invalid or expired OAuth state")
-        return stored
-    try:
-        return int(state)
-    except ValueError:
-        raise HTTPException(400, "Invalid OAuth state") from None
+    prefix, separator, token = state.partition(":")
+    if not separator or not prefix.isdecimal() or not token:
+        raise HTTPException(400, "Invalid OAuth state")
+    stored = await consume_oauth_state(token)
+    if stored is None or str(stored) != prefix:
+        raise HTTPException(400, "Invalid or expired OAuth state")
+    return stored
 
 
 @router.get("/spotify/callback")
